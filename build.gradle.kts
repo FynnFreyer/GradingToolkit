@@ -21,17 +21,16 @@ tasks.register("aggregate") {
         subprojects.forEach { subproject ->
             // for each test task
             subproject.tasks.withType<Test>() {
-                // extract data from its path (like "repos:account:exercise")
+                // extract data from its path (like "repos:exercise:account")
                 val parts = subproject.path.split(":")
-                val studentName = parts[2]
-                val exerciseName = parts[3]
+                val assignmentSlug = parts[2]
+                val studentGithubName = parts[3]
 
-                val studentReportDir = file("${aggregateDir}/${studentName}")
+                val studentReportDir = file("${aggregateDir}/${studentGithubName}")
                 studentReportDir.mkdirs()
 
-
-                val subBuildDir = file(subproject.layout.buildDirectory).absolutePath
-                val testResults = "${subBuildDir}/test-results/test"
+                val subBuildDir = file(subproject.layout.buildDirectory)
+                val testResults = "${subBuildDir.absolutePath}/test-results/test"
 
                 // retrieve test results and copy to output dir
                 copy {
@@ -40,7 +39,7 @@ tasks.register("aggregate") {
                     }
                     into(studentReportDir)
                     eachFile {
-                        name = "${exerciseName}_${name}"
+                        name = "${assignmentSlug}_${name}"
                     }
                 }
             }
