@@ -5,11 +5,14 @@ from pathlib import Path
 from subprocess import run
 from typing import Self
 from xml.etree import ElementTree as ET
+from xmlrpc.client import DateTime
 
 from pandas import to_datetime, to_numeric, DataFrame, read_csv
 
 from github_classroom_toolkit.utils import get_stdout, parse_tab_seperated_gh_output, directory
 from github_classroom_toolkit.utils import parse_grades_csv
+import re
+import shutil
 
 
 @dataclass
@@ -43,10 +46,11 @@ class Assignment:
     title: str
     deadline: datetime
     invite: str
+    base_dir: Path
 
     # TODO: add properties
     # starter_code: Repo
-    # slug: str
+    #slug : str
 
     @classmethod
     def from_classroom(cls, classroom: Classroom) -> list[Self]:
@@ -60,6 +64,40 @@ class Assignment:
         # cast to assignment objects
         assignments = assignment_data.apply(lambda row: cls(classroom, *row), axis=1).tolist()
         return assignments
+
+    def rename_folder_and_repos(self):
+        """
+        Rename the base folder from 'hausaufgabe-{n}-submissions' to 'hausaufgabe-{n}' and each repo from '
+        hausaufgabe-{n}-[student_name] to '[student-name]'
+        """
+        target_dir = None
+        for subdir in self.base_dir.iterdir():
+            if subdir.is_dir() and re.match(r"hausaufgabe-\d+-submissions", subdir.name):
+                target_dir = subdir
+                break
+
+        if target_dir is None:
+            raise FileExistsError
+
+        match = re.match(r"(hausaufgabe-(\d+))-submissions", target_dir.name)
+        if not match:
+            raise ValueError
+
+        assignment_base_name = match.group(1)
+        new_folder_path = self.base_dir / assignment_base_name
+
+        shutil.move(target_dir, new_folder_path)
+
+        print(f"Renamed base folder to '{assignment_base_name}'.")
+
+        for repo_dir in new_folder_path.iterdir():
+            if repo_dir.is_dir():
+                repo_match = re.match(rf"{assignment_base_name}-(.+)", repo_dir.name)
+                if repo_match:
+                    student_name = repo_match.group(1)
+                    new_repo_path = new_folder_path / student_name
+                    repo_dir.rename(new_repo_path)
+                    print(f"Renamed repo folder to {new_repo_path}.")
 
     @property
     def grades(self) -> DataFrame:
@@ -124,18 +162,29 @@ class RepoManager:
     classroom: Classroom
 
     def download_submissions(self) -> dict[Submission, Path]:
+        """
+        Download student submissions by cloning repositories.
+        :return:
+        """
+        self.clone_student_repos()
         submission_map = {}
         for assignment in self.classroom.assignments:
             for submission in assignment.submissions:
                 path = self.base_dir / submission.username / assignment.title
                 if path.exists():  # clone
                     path.mkdir(parents=True)
-                    run(["git", "clone", submission.repo_url, str(path)], check=True)
+                    run(["git", "pull"], check=True)
                     submission_map[submission] = path
                 else:  # update
                     with directory(path):
                         run(["git", "pull"], check=True)
         return submission_map
+
+    def clone_student_repos(self):
+        """
+        Automatically clone student repositories using the gh classroom command.
+        """
+        run(["gh", "classroom", "clone", "student-repos", "-a", str(self.classroom.id), "-d", str(self.base_dir)], check=True)
 
     @cached_property
     def assignment_map(self) -> dict[str, Assignment]:
@@ -216,3 +265,13 @@ class Grade:
             points_received += points_received_here
 
         return cls(user, submission, points_available, points_received)
+
+# Test cloning and renaming
+# if __name__ == "__main__":
+#     base_dir = Path("../../test")
+#     classroom_id = 622847
+#     classroom = Classroom(id=classroom_id, name="Test Classroom", url="https://classroom.github.com/a/xITCpvlP")
+#     repo_manager = RepoManager(base_dir=base_dir, classroom=classroom)
+#     repo_manager.clone_student_repos()
+#     assignment = Assignment(classroom, classroom_id, "Hausaufgabe 5", datetime.now(), "https://classroom.github.com/a/xITCpvlP", base_dir)
+#     assignment.rename_folder_and_repos()
