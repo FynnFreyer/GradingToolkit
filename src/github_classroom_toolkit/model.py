@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, date
 from functools import cached_property
 from pathlib import Path
-from subprocess import run
+from subprocess import run, CompletedProcess
 from typing import Self
 from xml.etree import ElementTree as ET
 
@@ -179,11 +179,14 @@ class RepoManager:
                         run(["git", "pull"], check=True)
         return submission_map
 
-    def clone_student_repos(self):
+    def clone_student_repos(self) -> CompletedProcess:
         """
         Automatically clone student repositories using the gh classroom command.
+
+        :raise CalledProcessError: If the command fails.
+        :return: The ``CompletedProcess`` instance.
         """
-        run(["gh", "classroom", "clone", "student-repos", "-a", str(self.classroom.id), "-d", str(self.base_dir)], check=True)
+        return run(["gh", "classroom", "clone", "student-repos", "-a", str(self.classroom.id), "-d", str(self.base_dir)], check=True)
 
     @cached_property
     def assignment_map(self) -> dict[str, Assignment]:
