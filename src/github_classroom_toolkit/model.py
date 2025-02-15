@@ -3,7 +3,7 @@ from datetime import datetime, date
 from functools import cached_property
 from pathlib import Path
 from subprocess import run, CompletedProcess
-from typing import Self
+from typing import Self, ClassVar
 from xml.etree import ElementTree as ET
 
 from pandas import to_datetime, to_numeric, DataFrame, read_csv
@@ -120,6 +120,8 @@ class Student:
     last_name: str
     email: str
 
+    __github_name_map: ClassVar[dict[str, Self]]
+
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
@@ -128,6 +130,17 @@ class Student:
     def from_student_data(cls, student_data_csv: str | Path) -> list[Self]:
         student_data = read_csv(student_data_csv)
         return student_data.apply(lambda row: cls(*row), axis=1).tolist()
+
+    @classmethod
+    def from_github_name(cls, github_name: str) -> Self:
+        """
+        Find a student based on their GitHub account name.
+
+        :param github_name: The GitHub account name of the student.
+        :raise KeyError: If name is unknown.
+        :return: The student with the specified name.
+        """
+        return cls.__github_name_map[github_name]
 
 
 @dataclass
