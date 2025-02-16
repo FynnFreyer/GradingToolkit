@@ -2,29 +2,32 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from github_classroom_toolkit.autograde import clone_repos
+from github_classroom_toolkit.model.course import Submission, Student
+from github_classroom_toolkit.model.github import Classroom
 from github_classroom_toolkit.utils import parse_grades_csvs
 
 
 def parse_args(args: list[str] | None = None) -> Namespace:
     parser = ArgumentParser()
 
-    parser.add_argument("csvs", nargs="+", type=Path, help="the GitHub classroom grade CSV files")
+    parser.add_argument("-c", "--classroom", type=int, required=True,
+                        help="the ID of the GitHub classroom to grade")
+
+    parser.add_argument("-s", "--students", type=Path, required=True,
+                        help="path to a CSV with names and GitHub accounts of students")
 
     return parser.parse_args(args)
 
 
 def main(args: Namespace | None = None):
     args = args or parse_args()
-    assignments = parse_grades_csvs(args.csv)
-    clone_repos(assignments)
 
-    lines = ["user,percentage\n"]
-    for assignment in assignments:
-        lines.append(f"{assignment.user},{assignment.percentage or 0}\n")
-    with open("results/summary.csv", "w") as file:
-        file.writelines(lines)
+    students = Student.from_student_data(args.students)
+    classroom = Classroom.from_id(args.classroom)
+    assignments = classroom.assignments
+    submission_lists = {assignment: Submission.from_assignment(assignment) for assignment in assignments}
+    print(submission_lists, students)
 
 
 if __name__ == '__main__':
-    args = parse_args()
-    main(args)
+    main()

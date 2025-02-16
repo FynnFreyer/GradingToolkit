@@ -1,0 +1,241 @@
+from dataclasses import dataclass
+from os import rename, rmdir
+from pathlib import Path
+from subprocess import run
+from typing import Self, ClassVar
+from xml.etree import ElementTree as ET
+
+from pandas import read_csv
+
+from github_classroom_toolkit.model.git import Repository
+from github_classroom_toolkit.model.github import Assignment, Classroom
+from github_classroom_toolkit.utils import get_stdout, parse_cloned_paths
+
+
+@dataclass
+class Course:
+    """The course to be graded."""
+
+    classroom: Classroom
+    """The GitHub classroom for this course."""
+
+    students: list["Student"]
+    """The students in this course."""
+
+    assignments: list[Assignment]
+    """The assigned course work."""
+
+    submissions: list["Submission"]
+    """The student submissions."""
+
+    @classmethod
+    def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
+        """
+
+        :param classroom_id:
+        :param students_csv:
+        :return:
+        """
+
+
+@dataclass
+class Student:
+    """A student of the course."""
+
+    github_name: str
+    """The GitHub account name of this student."""
+
+    first_name: str
+    """The first name of this student."""
+
+    last_name: str
+    """The last name of this student."""
+
+    email: str
+    """The email address of this student."""
+
+    __github_name_map: ClassVar[dict[str, Self]] = {}
+    """A dictionary mapping GitHub account names to student objects."""
+
+    def __post_init__(self):
+        # add student to lookup table after instantiation
+        self.__github_name_map[self.github_name] = self
+
+    @property
+    def full_name(self) -> str:
+        """The first name, followed by the last name seperated by a space."""
+        return f"{self.first_name} {self.last_name}"
+
+    @classmethod
+    def from_student_data(cls, student_data_csv: str | Path) -> list[Self]:
+        """
+        Parse students from a CSV file.
+        The file should have this format:
+
+        +----------------+------------+-----------+------------------------+
+        | github_name    | first_name | last_name | email                  |
+        +----------------+------------+-----------+------------------------+
+        | johndoe123     | John       | Doe       | johndoe@example.com    |
+        | janedoe456     | Jane       | Doe       | janedoe@example.com    |
+        | devguy789      | Mark       | Smith     | marksmith@example.com  |
+        | coderjack99    | Jack       | Turner    | jackturner@example.com |
+        | ...            | ...        | ...       | ...                    |
+        +----------------+------------+-----------+------------------------+
+
+        :param student_data_csv: Path to a CSV file containing the student data.
+        :return: A list of students.
+        """
+        student_data = read_csv(student_data_csv)
+        return student_data.apply(lambda row: cls(*row), axis=1).tolist()
+
+    @classmethod
+    def from_github_name(cls, github_name: str) -> Self:
+        """
+        Find a student based on their GitHub account name.
+
+        :param github_name: The GitHub account name of the student.
+        :raise KeyError: If name is unknown.
+        :return: The student with the specified name.
+        """
+        return cls.__github_name_map[github_name]
+
+
+@dataclass
+class Submission:
+    assignment: Assignment
+    """The :class:`Assignment` that this submission relates to."""
+
+    student: Student
+    """The :class:`Student` that submitted this work."""
+
+    repo: Repository
+    """The :class:`~github_classroom_toolkit.model.git.Repository` that contains the submitted work."""
+
+    @classmethod
+    def from_assignment(cls, assignment: Assignment) -> list[Self]:
+        """
+        Download student submissions by cloning repositories.
+
+        :param assignment: The assignment for which to retrieve the submissions.
+        :return: A list of :class:`Submission` objects for this assignment.
+        """
+
+        # clone and rename the submissions
+        submission_paths = cls._clone_student_repos(assignment)
+        repos = cls._rename_repos(submission_paths)
+
+        # create submissions
+        submissions = []
+        for repo in repos:
+            github_name = repo.path.name
+            try:
+                student = Student.from_github_name(github_name)
+            except KeyError:
+                # TODO: replace with log call
+                print(f"Couldn't find student: {github_name}")
+                continue
+            submission = cls(assignment, student, repo)
+            submissions.append(submission)
+        return submissions
+
+    @staticmethod
+    def _clone_student_repos(assignment: Assignment) -> list[Path]:
+        """
+        Automatically clone student repositories using the gh classroom command.
+        Student repositories are cloned into an assignment directory
+        inside the ``base_dir`` of the classroom the assignment belongs to.
+
+        :param assignment: The assignment to clone submission repos for.
+        :raise CalledProcessError: If the command fails.
+        :return: A list of paths pointing to the downloaded submissions.
+        """
+        stdout = get_stdout("gh", "classroom", "clone", "student-repos",
+                            "-a", assignment.id, "-d", assignment.classroom.base_dir)
+        submission_paths = parse_cloned_paths(stdout)
+        return submission_paths
+
+    @staticmethod
+    def _rename_repos(submission_paths: list[Path]) -> list[Repository]:
+        """
+        Rename the base folder from ``{assignment_slug}-submissions`` to ``{assignment_slug}``
+        and each repo from ``{assignment_slug}-{student_name} to ``{student_name}``.
+
+        :param submission_paths: A list of paths pointing to the submitted repositories.
+        :return: A list of :class:`Repository` objects pointing to the renamed submissions.
+        """
+        submission_path = None  # init submission_path for the else branch
+        repos = []
+        for submission_path in submission_paths:
+            # find the assignment slug and github name
+            assignment_slug = submission_path.parent.name[:-len("-submissions")]
+            github_name = submission_path.name[len(f"{assignment_slug}-"):]
+            # move the repo to its proper path
+            new_path = submission_path.parent.parent / assignment_slug / github_name
+            rename(submission_path, new_path)
+            # turn the path into a repository
+            repo = Repository(new_path)
+            repos.append(repo)
+        else:
+            # clean up old assignment directory in the end
+            if submission_path:
+                rmdir(submission_path.parent)
+
+        return repos
+
+
+@dataclass
+class Grade:
+    user: Student
+    submission: Submission
+    points_available: int
+    points_received: int
+
+    @property
+    def percentage(self) -> float:
+        return self.points_received / self.points_available
+
+    @property
+    def is_passing_grade(self) -> bool:
+        return self.percentage >= 0.5
+
+    def find_test_xmls(self, user_map: dict[str, Student]) -> dict[Student, dict[Assignment, "Grade"]]:
+        run(["./gradlew", "test", "aggregate", "--info"], check=True)
+
+        aggregate_dir = Path("build/reports/aggregate")
+        test_results = list(aggregate_dir.glob("*/*_TEST-*.xml"))
+        test_file_map = {user: {assignment: [] for assignment in self.assignment_map.values()} for user in
+                         user_map.values()}
+
+        for result in test_results:
+            account_name = result.parent.name
+            user = user_map.get(account_name)
+
+            assignment_name, _test_name = result.name.split("_TEST-")
+            assignment = self.assignment_map.get(assignment_name)
+
+            test_file_map.get(user, dict()).get(assignment, list()).append(result)
+
+        return {user: {assignment: Grade.from_test_xmls(user, submission, )} for user, assignment_dict in
+                test_file_map.items()}
+
+    @classmethod
+    def from_test_xmls(cls, user: Student, submission: Submission, test_xmls: list[str | Path]) -> Self:
+        points_available = 0
+        points_received = 0
+        for test_xml in test_xmls:
+            # retrieve data
+            root = ET.parse(test_xml).getroot()
+            tests = int(root.attrib['tests'])
+            skipped = int(root.attrib['skipped'])
+            failures = int(root.attrib['failures'])
+            errors = int(root.attrib['errors'])
+
+            # calculate points from this test
+            points_available_here = tests - skipped
+            points_received_here = points_available_here - failures - errors
+
+            # add to tally
+            points_available += points_available_here
+            points_received += points_received_here
+
+        return cls(user, submission, points_available, points_received)

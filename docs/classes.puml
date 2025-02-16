@@ -1,0 +1,46 @@
+@startuml
+package model {
+    package course {
+        class Student {
+            github_name: str
+            first_name: str
+            last_name: str
+            email: str
+            full_name: str <<property>>
+
+            {static} __github_name_map: dict[str, Self]
+            --
+            {static} from_student_data(student_data_csv: str | Path): list[Self]
+            {static} from_github_name(github_name: str): Self
+        }
+
+        class Course
+        class Submission
+        class Grade
+    }
+    package git {
+        class Repository
+    }
+    package gh_classroom {
+        class Classroom {
+            id: int
+            name: str
+            url: str
+            assignments: list[Assignment] <<property>>
+            --
+            {static} get_classrooms(): list[Self]
+        }
+        class Assignment {
+            classroom: Classroom
+            id: int
+            title: str
+            slug: str
+            deadline: datetime | None
+            invite: str
+            starter_code: Repository
+        }
+
+        Classroom *-- Assignment
+    }
+}
+@enduml

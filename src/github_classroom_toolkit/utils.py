@@ -1,8 +1,10 @@
 from contextlib import contextmanager
 from os import getcwd, chdir
-from pandas import DataFrame, concat, read_csv, to_datetime
 from pathlib import Path
+from re import sub
 from subprocess import run
+
+from pandas import DataFrame, concat, read_csv, to_datetime
 
 
 @contextmanager
@@ -16,8 +18,13 @@ def directory(dir_path: str | Path):
 
 
 def get_stdout(*tokens) -> str:
-    proc = run([str(token) for token in tokens if token is not None], text=True, capture_output=True, check=True)
-    return proc.stdout
+    # skip falsy tokens and run the command
+    token_list = [str(token) for token in tokens if token]
+    proc = run(token_list, text=True, capture_output=True, check=True)
+    # remove ANSI escape sequences
+    escape_sequence_pattern = r"\x1b\[[0-9;]*[a-zA-Z]"
+    cleaned_output = sub(escape_sequence_pattern, '', proc.stdout)
+    return cleaned_output.strip()
 
 
 def parse_tab_seperated_gh_output(stdout: str) -> DataFrame:
@@ -40,6 +47,12 @@ def parse_grades_csv(path: str | Path) -> DataFrame:
 
 
 def parse_grades_csvs(paths: list[str | Path] | None = None) -> DataFrame:
+    """
+    Parse a list of ``grades.csv`` files.
+
+    :param paths: List of paths to ``grades.csv`` files.
+    :return: The relevant data, loaded into a dataframe.
+    """
     if paths is not None:
         paths = [Path(p) for p in paths]
     else:
@@ -47,3 +60,19 @@ def parse_grades_csvs(paths: list[str | Path] | None = None) -> DataFrame:
     paths = [p.resolve() for p in paths]
 
     return concat([parse_grades_csv(path) for path in paths])
+
+
+def parse_cloned_paths(stdout: str) -> list[Path]:
+    """
+    Parse output of ``gh classroom`` subcommands of the form ``Cloned into: <path>``.
+
+    :param stdout: The subcommands stdout.
+    :return: A list of paths.
+    """
+    clone_prefix = "Cloning into: "
+    cloned_paths = [
+        Path(line[len(clone_prefix):])
+        for line in stdout.splitlines()
+        if line.startswith(clone_prefix)
+    ]
+    return cloned_paths

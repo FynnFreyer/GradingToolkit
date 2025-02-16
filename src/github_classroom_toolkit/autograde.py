@@ -9,8 +9,7 @@ from pathlib import Path
 from shutil import copytree, rmtree
 from subprocess import run
 
-from github_classroom_toolkit.model import Assignment, Student
-from github_classroom_toolkit.utils import directory
+from github_classroom_toolkit.model.github import Assignment
 
 
 def clone_repos(
