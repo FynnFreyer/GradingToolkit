@@ -1,10 +1,8 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-from github_classroom_toolkit.autograde import clone_repos
 from github_classroom_toolkit.model.course import Submission, Student
 from github_classroom_toolkit.model.github import Classroom
-from github_classroom_toolkit.utils import parse_grades_csvs
 
 
 def parse_args(args: list[str] | None = None) -> Namespace:
