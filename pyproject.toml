@@ -15,6 +15,10 @@ dependencies = [
 ]
 dynamic = ['description', 'version', 'authors', 'maintainers']
 
+[project.urls]
+Repository = 'https://github.com/FynnFreyer/GradingToolkit'
+Issues = 'https://github.com/FynnFreyer/GradingToolkit/issues'
+
 [project.scripts]
 autograde = 'github_classroom_toolkit.__main__:main'
 
