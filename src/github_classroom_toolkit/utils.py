@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from os import getcwd, chdir
 from pathlib import Path
 from re import sub
-from subprocess import run
+from subprocess import run, CalledProcessError
 
 from pandas import DataFrame, concat, read_csv, to_datetime
 
@@ -20,10 +20,16 @@ def directory(dir_path: str | Path):
 def get_stdout(*tokens) -> str:
     # skip falsy tokens and run the command
     token_list = [str(token) for token in tokens if token]
-    proc = run(token_list, text=True, capture_output=True, check=True)
+    try:
+        proc = run(token_list, text=True, capture_output=True, check=True)
+    except CalledProcessError as e:
+        cmd = " ".join(token_list)
+        raise RuntimeError(f"Command `{cmd}` failed with returncode {e.returncode}\n"
+                           f"  stdout:\n{e.stdout}\n\n"
+                           f"  stderr:\n{e.stderr}") from e
     # remove ANSI escape sequences
     escape_sequence_pattern = r"\x1b\[[0-9;]*[a-zA-Z]"
-    cleaned_output = sub(escape_sequence_pattern, '', proc.stdout)
+    cleaned_output = sub(escape_sequence_pattern, "", proc.stdout)
     return cleaned_output.strip()
 
 
