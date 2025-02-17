@@ -65,7 +65,7 @@ class Classroom:
 
     @classmethod
     @cache
-    def get_classrooms(cls) -> tuple[Self]:
+    def get_classrooms(cls) -> tuple[Self, ...]:
         """
         Get a tuple of all classrooms you have access to.
 
@@ -82,7 +82,7 @@ class Classroom:
         return tuple(rooms)
 
     @cached_property
-    def assignments(self) -> tuple["Assignment"]:
+    def assignments(self) -> tuple["Assignment", ...]:
         """A tuple of assignments for this classroom."""
         return Assignment.from_classroom(self)
 
@@ -120,7 +120,7 @@ class Assignment:
 
     @classmethod
     @cache
-    def from_classroom(cls, classroom: Classroom) -> tuple[Self]:
+    def from_classroom(cls, classroom: Classroom) -> tuple[Self, ...]:
         """
         Find all assignments for a given class.
 
