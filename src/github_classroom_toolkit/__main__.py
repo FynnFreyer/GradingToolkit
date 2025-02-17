@@ -1,11 +1,12 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
+from typing import Sequence
 
 from github_classroom_toolkit.model.course import Submission, Student
 from github_classroom_toolkit.model.github import Classroom
 
 
-def parse_args(args: list[str] | None = None) -> Namespace:
+def parse_args(args: Sequence[str] | None = None) -> Namespace:
     parser = ArgumentParser()
 
     parser.add_argument("-c", "--classroom", type=int, required=True,
