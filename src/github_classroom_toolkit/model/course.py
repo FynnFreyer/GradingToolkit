@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from os import rename, rmdir
 from pathlib import Path
-from subprocess import run
+from subprocess import run, CompletedProcess
 from typing import Self, ClassVar
 from xml.etree import ElementTree as ET
 
@@ -198,28 +198,39 @@ class Grade:
     def is_passing_grade(self) -> bool:
         return self.percentage >= 0.5
 
-    def find_test_xmls(self, user_map: dict[str, Student]) -> dict[Student, dict[Assignment, "Grade"]]:
-        run(["./gradlew", "test", "aggregate", "--info"], check=True)
+    @staticmethod
+    def test_submissions() -> CompletedProcess:
+        return run(["./gradlew", "test", "aggregate", "--info"], check=True)
 
+    @staticmethod
+    def find_test_xmls(submissions: list[Submission]) -> dict[Submission, list[Path]]:
         aggregate_dir = Path("build/reports/aggregate")
-        test_results = list(aggregate_dir.glob("*/*_TEST-*.xml"))
-        test_file_map = {user: {assignment: [] for assignment in self.assignment_map.values()} for user in
-                         user_map.values()}
+        test_results = list(aggregate_dir.glob(f"*/{submissions[0].assignment.slug}_TEST-*.xml"))
+        assignment_map = {}
+        user_map = {}
+        test_file_map = {
+            user: {
+                assignment: []
+                for assignment
+                in assignment_map.values()
+            }
+            for user
+            in user_map.values()
+        }
 
         for result in test_results:
             account_name = result.parent.name
             user = user_map.get(account_name)
 
             assignment_name, _test_name = result.name.split("_TEST-")
-            assignment = self.assignment_map.get(assignment_name)
+            assignment = assignment_map.get(assignment_name)
 
             test_file_map.get(user, dict()).get(assignment, list()).append(result)
 
-        return {user: {assignment: Grade.from_test_xmls(user, submission, )} for user, assignment_dict in
-                test_file_map.items()}
+        return {}
 
     @classmethod
-    def from_test_xmls(cls, user: Student, submission: Submission, test_xmls: list[str | Path]) -> Self:
+    def from_test_xmls(cls, submission: Submission, test_xmls: list[str | Path]) -> Self:
         points_available = 0
         points_received = 0
         for test_xml in test_xmls:
@@ -238,4 +249,4 @@ class Grade:
             points_available += points_available_here
             points_received += points_received_here
 
-        return cls(user, submission, points_available, points_received)
+        return cls(submission, points_available, points_received)
