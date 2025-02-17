@@ -1,6 +1,6 @@
 from contextlib import contextmanager
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from imaplib import IMAP4_SSL, Time2Internaldate
 from time import time
 

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from functools import cached_property, cache
+from functools import cache, cached_property
 from os import rename, rmdir
 from pathlib import Path
-from subprocess import run, CompletedProcess
-from typing import Self, ClassVar, Collection
+from subprocess import CompletedProcess, run
+from typing import ClassVar, Collection, Self
 from xml.etree import ElementTree as ET
 
 from pandas import read_csv
@@ -248,10 +248,10 @@ class Grade:
         for test_xml in test_xmls:
             # retrieve data
             root = ET.parse(test_xml).getroot()
-            tests = int(root.attrib['tests'])
-            skipped = int(root.attrib['skipped'])
-            failures = int(root.attrib['failures'])
-            errors = int(root.attrib['errors'])
+            tests = int(root.attrib["tests"])
+            skipped = int(root.attrib["skipped"])
+            failures = int(root.attrib["failures"])
+            errors = int(root.attrib["errors"])
 
             # calculate points from this test
             points_available_here = tests - skipped

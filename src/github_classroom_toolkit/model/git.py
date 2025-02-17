@@ -3,10 +3,10 @@ Module that deals with git related matters.
 """
 from dataclasses import dataclass
 from datetime import date, datetime
-from functools import cached_property, cache
+from functools import cache, cached_property
 from pathlib import Path
 from re import search
-from subprocess import run, CompletedProcess
+from subprocess import CompletedProcess, run
 
 from github_classroom_toolkit.utils import directory, get_stdout
 

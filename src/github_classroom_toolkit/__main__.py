@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Sequence
 
-from github_classroom_toolkit.model.course import Submission, Student
+from github_classroom_toolkit.model.course import Student, Submission
 from github_classroom_toolkit.model.github import Classroom
 
 
@@ -32,5 +32,5 @@ def main(args: Namespace | None = None):
     print(submission_lists, students)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

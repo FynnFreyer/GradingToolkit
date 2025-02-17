@@ -1,8 +1,8 @@
 from contextlib import contextmanager
-from os import getcwd, chdir
+from os import chdir, getcwd
 from pathlib import Path
 from re import sub
-from subprocess import run, CalledProcessError
+from subprocess import CalledProcessError, run
 
 from pandas import DataFrame, concat, read_csv, to_datetime
 

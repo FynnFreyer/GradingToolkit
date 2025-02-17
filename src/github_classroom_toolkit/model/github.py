@@ -1,18 +1,18 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from functools import cached_property, cache
+from functools import cache, cached_property
 from pathlib import Path
-from re import search, MULTILINE
+from re import MULTILINE, search
 from shutil import move
-from subprocess import run, CalledProcessError
+from subprocess import CalledProcessError, run
 from tempfile import TemporaryDirectory
 from typing import Self
 
-from pandas import to_datetime, to_numeric, DataFrame
+from pandas import DataFrame, to_datetime, to_numeric
 
 from github_classroom_toolkit.model.git import Repository
-from github_classroom_toolkit.utils import get_stdout, parse_tab_seperated_gh_output, parse_cloned_paths
-from github_classroom_toolkit.utils import parse_grades_csv
+from github_classroom_toolkit.utils import (get_stdout, parse_cloned_paths, parse_grades_csv,
+                                            parse_tab_seperated_gh_output)
 
 
 @dataclass(frozen=True)
