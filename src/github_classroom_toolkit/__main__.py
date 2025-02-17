@@ -23,8 +23,12 @@ def main(args: Namespace | None = None):
 
     students = Student.from_student_data(args.students)
     classroom = Classroom.from_id(args.classroom)
-    assignments = classroom.assignments
-    submission_lists = {assignment: Submission.from_assignment(assignment) for assignment in assignments}
+
+    submission_lists = {
+        assignment: Submission.from_assignment(assignment)
+        for assignment in classroom.assignments
+    }
+
     print(submission_lists, students)
 
 
