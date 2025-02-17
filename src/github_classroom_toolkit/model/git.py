@@ -27,7 +27,7 @@ class Repository:
 
     def __post_init__(self):
         # ensure that paths are resolved and point to a directory
-        setattr(self, "path", self.path.resolve(strict=True))
+        object.__setattr__(self, "path", self.path.resolve(strict=True))
         if not self.path.is_dir():
             raise ValueError("Path is not a directory.")
 

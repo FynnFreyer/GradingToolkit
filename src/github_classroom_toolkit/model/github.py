@@ -28,13 +28,13 @@ class Classroom:
     url: str
     """The URL of this classroom."""
 
-    base_dir: Path = field(init=False)
+    base_dir: Path = None
     """The directory to use for storing starter code and submissions for assigned work."""
 
     def __post_init__(self):
         # TODO: doing this here seems super clumsy and like a bad idea in general
         # ensure that the classroom has a base directory to clone assignment data into
-        setattr(self, "base_dir", Path("repos").resolve())
+        object.__setattr__(self, "base_dir", Path("repos").resolve())
         self.base_dir.mkdir(exist_ok=True)
 
     @property
@@ -106,12 +106,12 @@ class Assignment:
     invite_url: str
     """The URL under which this assignment may be accepted."""
 
-    starter_code: Repository = field(init=False)
+    starter_code: Repository = None
     """A :class:`~github_classroom_toolkit.model.git.Repository` containing the starter code for this assignment."""
 
     def __post_init__(self):
         # download the starter code repository
-        setattr(self, "starter_code", self._clone_starter_code())
+        object.__setattr__(self, "starter_code", self._clone_starter_code())
 
     @property
     def slug(self) -> str:
