@@ -83,7 +83,6 @@ exclude_lines = [
 # Linting options
 [tool.ruff]
 line-length = 120
-format = 'pylint'
 src = ['src', 'tst']
 select = ['E', 'F', 'B', 'Q']
 show-fixes = true
