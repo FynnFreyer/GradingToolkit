@@ -19,8 +19,13 @@ class Course:
     classroom: Classroom
     """The GitHub classroom for this course."""
 
-    students: list["Student"]
-    """The students in this course."""
+    _student_map: dict[str, "Student"]
+    """Maps GitHub name to student object."""
+
+    @property
+    def students(self) -> list["Student"]:
+        """The students in this course."""
+        return list(self._student_map.values())
 
     @classmethod
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
