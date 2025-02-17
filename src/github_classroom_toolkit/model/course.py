@@ -22,12 +22,6 @@ class Course:
     students: list["Student"]
     """The students in this course."""
 
-    assignments: list[Assignment]
-    """The assigned course work."""
-
-    submissions: list["Submission"]
-    """The student submissions."""
-
     @classmethod
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
         """
