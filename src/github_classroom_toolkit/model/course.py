@@ -192,7 +192,6 @@ class Submission:
 
 @dataclass
 class Grade:
-    user: Student
     submission: Submission
     points_available: int
     points_received: int
