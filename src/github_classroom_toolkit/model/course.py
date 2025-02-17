@@ -110,6 +110,10 @@ class Submission:
     repo: Repository
     """The :class:`~github_classroom_toolkit.model.git.Repository` that contains the submitted work."""
 
+    # def __post_init__(self):
+    #     # restore tests
+    #     self._restore_tests()
+
     @classmethod
     def from_assignment(cls, assignment: Assignment) -> list[Self]:
         """
@@ -180,6 +184,10 @@ class Submission:
                 rmdir(submission_path.parent)
 
         return repos
+
+    def _restore_tests(self) -> None:
+        """Restore the contents of ``src/test/`` to the contents of the starter code repository for this assignment."""
+        raise NotImplementedError
 
 
 @dataclass
