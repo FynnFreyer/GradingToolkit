@@ -6,8 +6,8 @@ from datetime import date, datetime
 from functools import cached_property
 from pathlib import Path
 from re import search
-from subprocess import run
 from shutil import move
+from subprocess import run, CompletedProcess
 from typing import Self
 
 from github_classroom_toolkit.utils import directory, get_stdout
@@ -94,7 +94,7 @@ class Repository:
         with directory(self.path):
             return get_stdout("git", "log", branch, deadline, "-n", 1, "--format='%H'")
 
-    def checkout(self, branch_or_commit: str = "main") -> None:
+    def checkout(self, branch_or_commit: str = "main") -> CompletedProcess:
         """
         Check out a commit by its hash.
 
@@ -102,4 +102,4 @@ class Repository:
         :return: Nothing.
         """
         with directory(self.path):
-            run(["git", "checkout", branch_or_commit], check=True)
+            return run(["git", "checkout", branch_or_commit], check=True)
