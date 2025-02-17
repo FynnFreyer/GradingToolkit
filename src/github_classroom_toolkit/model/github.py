@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import cached_property, cache
 from pathlib import Path
 from re import search, MULTILINE
 from shutil import move
@@ -41,6 +42,7 @@ class Classroom:
         """The slug from the url."""
         return self.url.split("/")[-1]
 
+    @cache
     @classmethod
     def from_id(cls, classroom_id: int) -> Self:
         """
@@ -62,6 +64,7 @@ class Classroom:
             raise ValueError("Failed to parse output of `gh classroom view`.") from e
 
     @classmethod
+    @cache
     def get_classrooms(cls) -> tuple[Self]:
         """
         Get a tuple of all classrooms you have access to.
@@ -78,7 +81,7 @@ class Classroom:
             rooms.append(cls(int(room_id), room_name, room_url))
         return tuple(rooms)
 
-    @property
+    @cached_property
     def assignments(self) -> tuple["Assignment"]:
         """A tuple of assignments for this classroom."""
         return Assignment.from_classroom(self)
@@ -116,6 +119,7 @@ class Assignment:
         return self.starter_code.path.parent.name
 
     @classmethod
+    @cache
     def from_classroom(cls, classroom: Classroom) -> tuple[Self]:
         """
         Find all assignments for a given class.
@@ -136,7 +140,7 @@ class Assignment:
         assignments = assignment_data.apply(lambda row: cls(classroom, *row), axis=1).tolist()
         return tuple(assignments)
 
-    @property
+    @cached_property
     def grades(self) -> DataFrame:
         """Downloads the ``grades.csv`` file for this assignment and loads it into a DataFrame."""
         grades_csv = Path(f"{self.id}_grades.csv")
@@ -145,12 +149,13 @@ class Assignment:
             run(cmd, check=True)
         return parse_grades_csv(grades_csv)
 
+    @cache
     def _clone_starter_code(self) -> Repository:
         """
         Clone the starter code into the base directory.
 
         :raise CalledProcessError: If the ``gh clone`` command fails.
-        :return: A list of paths pointing to the downloaded submissions.
+        :return: A :class:`~github_classroom_toolkit.model.git.Repository` containing the assignments starter code.
         """
         with TemporaryDirectory() as tmp:
             # clone the starter code repo to a temp dir

@@ -3,7 +3,7 @@ Module that deals with git related matters.
 """
 from dataclasses import dataclass
 from datetime import date, datetime
-from functools import cached_property
+from functools import cached_property, cache
 from pathlib import Path
 from re import search
 from subprocess import run, CompletedProcess
@@ -36,6 +36,7 @@ class Repository:
         """The origin remote."""
         return self.get_remote("origin")
 
+    @cache
     def get_remote(self, remote: str, query: bool = False) -> str:
         """
         Get the fetch and push URL of a specified remote.
@@ -60,6 +61,7 @@ class Repository:
 
         return fetch_url
 
+    @cache
     def get_latest_commit_hash(self, deadline: date | datetime | None = None, branch: str | None = None) -> str:
         """
         Get the hash of the last commit on the specified branch before the specified date.

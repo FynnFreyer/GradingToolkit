@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import cached_property, cache
 from os import rename, rmdir
 from pathlib import Path
 from subprocess import run, CompletedProcess
@@ -28,6 +29,7 @@ class Course:
         return {student.github_name: student for student in self.students}
 
     @classmethod
+    @cache
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
         """
 
@@ -60,12 +62,13 @@ class Student:
         # add student to lookup table after instantiation
         self.__github_name_map[self.github_name] = self
 
-    @property
+    @cached_property
     def full_name(self) -> str:
         """The first name, followed by the last name seperated by a space."""
         return f"{self.first_name} {self.last_name}"
 
     @classmethod
+    @cache
     def from_student_data(cls, student_data_csv: str | Path) -> tuple[Self, ...]:
         """
         Parse students from a CSV file.
@@ -89,6 +92,7 @@ class Student:
         return tuple(students)
 
     @classmethod
+    @cache
     def from_github_name(cls, github_name: str) -> Self:
         """
         Find a student based on their GitHub account name.
@@ -116,6 +120,7 @@ class Submission:
     #     self._restore_tests()
 
     @classmethod
+    @cache
     def from_assignment(cls, assignment: Assignment) -> tuple[Self, ...]:
         """
         Download student submissions by cloning repositories.
@@ -197,11 +202,11 @@ class Grade:
     points_available: int
     points_received: int
 
-    @property
+    @cached_property
     def percentage(self) -> float:
         return self.points_received / self.points_available
 
-    @property
+    @cached_property
     def is_passing_grade(self) -> bool:
         return self.percentage >= 0.5
 
