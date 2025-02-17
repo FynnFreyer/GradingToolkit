@@ -19,7 +19,7 @@ class RemoteURLNotFoundError(ValueError):
     """Is raised when a remote URL cannot be parsed from the output of ``git remote show <remote>``."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class Repository:
     """A git repository that was cloned to the local file system."""
     path: Path
@@ -27,7 +27,7 @@ class Repository:
 
     def __post_init__(self):
         # ensure that paths are resolved and point to a directory
-        self.path = self.path.resolve(strict=True)
+        setattr(self, "path", self.path.resolve(strict=True))
         if not self.path.is_dir():
             raise ValueError("Path is not a directory.")
 

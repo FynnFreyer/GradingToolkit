@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from os import rename, rmdir
 from pathlib import Path
 from subprocess import run, CompletedProcess
-from typing import Self, ClassVar
+from typing import Self, ClassVar, Collection
 from xml.etree import ElementTree as ET
 
 from pandas import read_csv
@@ -12,20 +12,20 @@ from github_classroom_toolkit.model.github import Assignment, Classroom
 from github_classroom_toolkit.utils import get_stdout, parse_cloned_paths
 
 
-@dataclass
+@dataclass(frozen=True)
 class Course:
     """The course to be graded."""
 
     classroom: Classroom
     """The GitHub classroom for this course."""
 
-    _student_map: dict[str, "Student"]
-    """Maps GitHub name to student object."""
+    students: tuple["Student", ...]
+    """The students in this course."""
 
     @property
-    def students(self) -> list["Student"]:
-        """The students in this course."""
-        return list(self._student_map.values())
+    def student_map(self) -> dict[str, "Student"]:
+        """Maps GitHub name to student object."""
+        return {student.github_name: student for student in self.students}
 
     @classmethod
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
@@ -37,7 +37,7 @@ class Course:
         """
 
 
-@dataclass
+@dataclass(frozen=True)
 class Student:
     """A student of the course."""
 
@@ -66,7 +66,7 @@ class Student:
         return f"{self.first_name} {self.last_name}"
 
     @classmethod
-    def from_student_data(cls, student_data_csv: str | Path) -> list[Self]:
+    def from_student_data(cls, student_data_csv: str | Path) -> tuple[Self, ...]:
         """
         Parse students from a CSV file.
         The file should have this format:
@@ -82,10 +82,11 @@ class Student:
         +----------------+------------+-----------+------------------------+
 
         :param student_data_csv: Path to a CSV file containing the student data.
-        :return: A list of students.
+        :return: A tuple of students.
         """
         student_data = read_csv(student_data_csv)
-        return student_data.apply(lambda row: cls(*row), axis=1).tolist()
+        students = student_data.apply(lambda row: cls(*row), axis=1).tolist()
+        return tuple(students)
 
     @classmethod
     def from_github_name(cls, github_name: str) -> Self:
@@ -99,7 +100,7 @@ class Student:
         return cls.__github_name_map[github_name]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Submission:
     assignment: Assignment
     """The :class:`Assignment` that this submission relates to."""
@@ -115,12 +116,12 @@ class Submission:
     #     self._restore_tests()
 
     @classmethod
-    def from_assignment(cls, assignment: Assignment) -> list[Self]:
+    def from_assignment(cls, assignment: Assignment) -> tuple[Self, ...]:
         """
         Download student submissions by cloning repositories.
 
         :param assignment: The assignment for which to retrieve the submissions.
-        :return: A list of :class:`Submission` objects for this assignment.
+        :return: A tuple of :class:`Submission` objects for this assignment.
         """
 
         # clone and rename the submissions
@@ -139,10 +140,10 @@ class Submission:
                 continue
             submission = cls(assignment, student, repo)
             submissions.append(submission)
-        return submissions
+        return tuple(submissions)
 
     @staticmethod
-    def _clone_student_repos(assignment: Assignment) -> list[Path]:
+    def _clone_student_repos(assignment: Assignment) -> tuple[Path, ...]:
         """
         Automatically clone student repositories using the gh classroom command.
         Student repositories are cloned into an assignment directory
@@ -150,21 +151,21 @@ class Submission:
 
         :param assignment: The assignment to clone submission repos for.
         :raise CalledProcessError: If the command fails.
-        :return: A list of paths pointing to the downloaded submissions.
+        :return: A tuple of paths pointing to the downloaded submissions.
         """
         stdout = get_stdout("gh", "classroom", "clone", "student-repos",
                             "-a", assignment.id, "-d", assignment.classroom.base_dir)
         submission_paths = parse_cloned_paths(stdout)
-        return submission_paths
+        return tuple(submission_paths)
 
     @staticmethod
-    def _rename_repos(submission_paths: list[Path]) -> list[Repository]:
+    def _rename_repos(submission_paths: Collection[Path]) -> tuple[Repository, ...]:
         """
         Rename the base folder from ``{assignment_slug}-submissions`` to ``{assignment_slug}``
         and each repo from ``{assignment_slug}-{student_name} to ``{student_name}``.
 
-        :param submission_paths: A list of paths pointing to the submitted repositories.
-        :return: A list of :class:`Repository` objects pointing to the renamed submissions.
+        :param submission_paths: A collection of paths pointing to the submitted repositories.
+        :return: A tuple of :class:`Repository` objects pointing to the renamed submissions.
         """
         submission_path = None  # init submission_path for the else branch
         repos = []
@@ -183,14 +184,14 @@ class Submission:
             if submission_path:
                 rmdir(submission_path.parent)
 
-        return repos
+        return tuple(repos)
 
     def _restore_tests(self) -> None:
         """Restore the contents of ``src/test/`` to the contents of the starter code repository for this assignment."""
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(frozen=True)
 class Grade:
     submission: Submission
     points_available: int
@@ -209,7 +210,7 @@ class Grade:
         return run(["./gradlew", "test", "aggregate", "--info"], check=True)
 
     @staticmethod
-    def find_test_xmls(submissions: list[Submission]) -> dict[Submission, list[Path]]:
+    def find_test_xmls(submissions: Collection[Submission]) -> dict[Submission, tuple[Path, ...]]:
         aggregate_dir = Path("build/reports/aggregate")
         test_results = list(aggregate_dir.glob(f"*/{submissions[0].assignment.slug}_TEST-*.xml"))
         assignment_map = {}
@@ -236,7 +237,7 @@ class Grade:
         return {}
 
     @classmethod
-    def from_test_xmls(cls, submission: Submission, test_xmls: list[str | Path]) -> Self:
+    def from_test_xmls(cls, submission: Submission, test_xmls: Collection[str | Path]) -> Self:
         points_available = 0
         points_received = 0
         for test_xml in test_xmls:

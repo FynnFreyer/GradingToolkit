@@ -14,7 +14,7 @@ from github_classroom_toolkit.utils import get_stdout, parse_tab_seperated_gh_ou
 from github_classroom_toolkit.utils import parse_grades_csv
 
 
-@dataclass
+@dataclass(frozen=True)
 class Classroom:
     """A GitHub classroom for a specific course. It contains assignments."""
 
@@ -33,7 +33,7 @@ class Classroom:
     def __post_init__(self):
         # TODO: doing this here seems super clumsy and like a bad idea in general
         # ensure that the classroom has a base directory to clone assignment data into
-        self.base_dir = Path("repos").resolve()
+        setattr(self, "base_dir", Path("repos").resolve())
         self.base_dir.mkdir(exist_ok=True)
 
     @property
@@ -62,11 +62,11 @@ class Classroom:
             raise ValueError("Failed to parse output of `gh classroom view`.") from e
 
     @classmethod
-    def get_classrooms(cls) -> list[Self]:
+    def get_classrooms(cls) -> tuple[Self]:
         """
-        Get a list of all classrooms you have access to.
+        Get a tuple of all classrooms you have access to.
 
-        :return: A list of all classrooms that one has access to.
+        :return: A tuple of all classrooms that one has access to.
         """
         stdout = get_stdout("gh", "classroom", "ls")  # ls output is not tab separated
         rooms = []
@@ -76,15 +76,15 @@ class Classroom:
             room_name = " ".join(parts[1: -1])
             room_url = parts[-1]
             rooms.append(cls(int(room_id), room_name, room_url))
-        return rooms
+        return tuple(rooms)
 
     @property
-    def assignments(self) -> list["Assignment"]:
-        """A list of assignments for this classroom."""
+    def assignments(self) -> tuple["Assignment"]:
+        """A tuple of assignments for this classroom."""
         return Assignment.from_classroom(self)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Assignment:
     """Assigned work."""
 
@@ -108,8 +108,7 @@ class Assignment:
 
     def __post_init__(self):
         # download the starter code repository
-        self.starter_code = self._clone_starter_code()
-        # download the submissions
+        setattr(self, "starter_code", self._clone_starter_code())
 
     @property
     def slug(self) -> str:
@@ -117,12 +116,12 @@ class Assignment:
         return self.starter_code.path.parent.name
 
     @classmethod
-    def from_classroom(cls, classroom: Classroom) -> list[Self]:
+    def from_classroom(cls, classroom: Classroom) -> tuple[Self]:
         """
         Find all assignments for a given class.
 
         :param classroom: The classroom of which to get the assignments.
-        :return: A list of assignments.
+        :return: A tuple of assignments.
         """
         # get assignments for classroom
         stdout = get_stdout("gh", "classroom", "assignments", "-c", classroom.id)
@@ -135,7 +134,7 @@ class Assignment:
 
         # cast to assignment objects
         assignments = assignment_data.apply(lambda row: cls(classroom, *row), axis=1).tolist()
-        return assignments
+        return tuple(assignments)
 
     @property
     def grades(self) -> DataFrame:
