@@ -42,8 +42,8 @@ class Classroom:
         """The slug from the url."""
         return self.url.split("/")[-1]
 
-    @cache
     @classmethod
+    @cache
     def from_id(cls, classroom_id: int) -> Self:
         """
         Retrieve a classroom based on its ID.
