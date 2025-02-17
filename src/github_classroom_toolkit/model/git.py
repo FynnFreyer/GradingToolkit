@@ -6,9 +6,7 @@ from datetime import date, datetime
 from functools import cached_property
 from pathlib import Path
 from re import search
-from shutil import move
 from subprocess import run, CompletedProcess
-from typing import Self
 
 from github_classroom_toolkit.utils import directory, get_stdout
 
@@ -61,24 +59,6 @@ class Repository:
             raise InconsistentRemoteURLError("Fetch and push URL are not identical.")
 
         return fetch_url
-
-    def move(self, new_path: str | Path) -> Self:
-        """
-        Move the repository to a new path.
-
-        :param new_path: The path that the repository should be moved to.
-        :raise FileExistsError: If the path exists.
-        :return: The object itself.
-        """
-        new_path = Path(new_path).resolve()
-        if new_path.exists():
-            raise FileExistsError("Path exists.")
-        else:
-            new_path.parent.mkdir(parents=True, exist_ok=True)
-
-        move(self.path, new_path)
-        self.path = new_path
-        return self
 
     def get_latest_commit_hash(self, deadline: date | datetime | None = None, branch: str | None = None) -> str:
         """
