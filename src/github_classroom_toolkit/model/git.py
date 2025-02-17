@@ -4,10 +4,10 @@ Module that deals with git related matters.
 from dataclasses import dataclass
 from datetime import date, datetime
 from functools import cached_property
-from os import rename
 from pathlib import Path
 from re import search
 from subprocess import run
+from shutil import move
 from typing import Self
 
 from github_classroom_toolkit.utils import directory, get_stdout
@@ -76,7 +76,7 @@ class Repository:
         else:
             new_path.parent.mkdir(parents=True, exist_ok=True)
 
-        rename(self.path, new_path)
+        move(self.path, new_path)
         self.path = new_path
         return self
 
