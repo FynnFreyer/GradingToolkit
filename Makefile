@@ -36,13 +36,13 @@ ifeq ($(REQUIREMENTS_EXIST),0)
 endif
 
 requirements-dev: ## (Re-)generate and update requirements-dev.txt.
-	uv pip compile  $(DEFAULT_COMPILE_ARGS) --upgrade --extra dev -o requirements-dev.txt pyproject.toml
+	uv pip compile  $(DEFAULT_COMPILE_ARGS) --upgrade --extra tools --extra types -o requirements-dev.txt pyproject.toml
 
 # define a variable to check if requirements-dev.txt exists
 REQUIREMENTS_DEV_EXIST := $(shell if [ -e requirements.txt ]; then echo 1; else echo 0; fi)
 requirements-dev.txt: ## Generate requirements-dev.txt, if it doesn't exist yet.
 ifeq ($(REQUIREMENTS_DEV_EXIST),0)
-	uv pip compile  $(DEFAULT_COMPILE_ARGS) --extra dev -o requirements-dev.txt pyproject.toml
+	uv pip compile  $(DEFAULT_COMPILE_ARGS) --extra tools --extra types -o requirements-dev.txt pyproject.toml
 endif
 
 requirements: requirements-min requirements-dev ## (Re-)generate and update both requirements.txt and requirements-dev.txt.

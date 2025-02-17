@@ -23,7 +23,7 @@ Issues = 'https://github.com/FynnFreyer/GradingToolkit/issues'
 autograde = 'github_classroom_toolkit.__main__:main'
 
 [project.optional-dependencies]
-dev = [
+tools = [
     'autopep8',
     'coverage[toml]',
     'isort',
@@ -37,6 +37,9 @@ dev = [
     'sphinxcontrib-plantuml',
     'sphinxcontrib-relativeinclude',
     'uv',
+]
+types = [
+    'pandas-stubs',
 ]
 
 [build-system]
