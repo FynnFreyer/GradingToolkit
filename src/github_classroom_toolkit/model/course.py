@@ -147,7 +147,6 @@ class Submission:
             submissions.append(submission)
         return tuple(submissions)
 
-
     @staticmethod
     def _clone_student_repos(assignment: Assignment) -> tuple[Path, ...]:
         """
@@ -173,14 +172,13 @@ class Submission:
             return tuple(submission_paths)
 
         # Clone only repositories that don't exist in the assignment-folder
-        for _, row in assignment.grades.iterrows():
-            gh_name = row["github_username"]
+        for (_, _, gh_name), row in assignment.grades.iterrows():
             repo_url = row["student_repository_url"]
             target = assignment_dir / gh_name
 
             # Skip existing submissions
             if target.is_dir():
-                #run(["git", "fetch", "--all"])  # TODO replace with desired git command (slow)
+                # run(["git", "fetch", "--all"])  # TODO replace with desired git command (slow)
                 submission_paths.append(target)
                 continue
 
@@ -192,7 +190,6 @@ class Submission:
                 raise RuntimeError(f"Unexpected error while cloning {gh_name}") from e
 
         return tuple(submission_paths)
-
 
     @staticmethod
     def _rename_repos(submission_paths: Collection[Path]) -> tuple[Repository, ...]:
@@ -247,7 +244,6 @@ class Submission:
                 raise RuntimeError(f"Failed to delete {assignment_dir}") from e
 
         return tuple(repos)
-
 
     def _restore_tests(self) -> None:
         """Restore the contents of ``src/test/`` to the contents of the starter code repository for this assignment."""

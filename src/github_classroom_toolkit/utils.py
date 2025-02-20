@@ -47,8 +47,7 @@ def parse_tab_seperated_gh_output(stdout: str) -> DataFrame:
 def parse_grades_csv(path: str | Path) -> DataFrame:
     data = read_csv(path)
     data.set_index(["assignment_name", "assignment_url", "github_username"], inplace=True)
-    data["github_username"] = data.index.get_level_values("github_username")
-    data = data[["student_repository_url", "submission_timestamp", "github_username"]]
+    data = data[["student_repository_url", "submission_timestamp"]]
     data["submission_timestamp"] = to_datetime(data["submission_timestamp"])
     return data
 
