@@ -163,17 +163,15 @@ class Submission:
         :return: A tuple of paths pointing to the downloaded submissions.
         """
         base_dir = assignment.classroom.base_dir / assignment.slug
-        print(base_dir)
-
         submission_paths = []
 
-
+        # Clone all repositories of one assignment when the assignment directory is empty except of the starter code
         if base_dir.is_dir() and set(base_dir.iterdir()) == {base_dir / "_starter-code"}:
-            print("Cloning all Repositories.")
             stdout = get_stdout("gh", "classroom", "clone", "student-repos",
                                 "-a", assignment.id, "-d", assignment.classroom.base_dir)
             submission_paths = parse_cloned_paths(stdout)
 
+        # Clone only repositories that don't exist
         else:
             for _, row in assignment.grades.iterrows():
                 gh_name = row["github_username"]
@@ -181,10 +179,10 @@ class Submission:
                 target = base_dir / gh_name
 
                 if target.is_dir():
+                    #run(["git", "fetch", "--all"])  # TODO replace with desired git command (slow)
                     submission_paths.append(target)
                     continue
                 try:
-                    print(f"Cloning Repository for {gh_name}.")
                     run(["gh", "repo", "clone", repo_url, str(target)], check=True, text=True, capture_output=True)
                     if target.is_dir():
                         submission_paths.append(target)
@@ -198,14 +196,20 @@ class Submission:
 
     @staticmethod
     def _rename_repos(submission_paths: Collection[Path]) -> tuple[Repository, ...]:
+        """
+        Rename the base folder from ``{assignment_slug}-submissions`` to ``{assignment_slug}``
+        and each repo from ``{assignment_slug}-{student_name} to ``{student_name}``. Removes empty '-submissions' folder
+
+        :param submission_paths: A collection of paths pointing to the submitted repositories.
+        :return: A tuple of :class:`Repository` objects pointing to the renamed submissions.
+        """
+
         repos = []
         moved_parents = set()
 
         for submission_path in submission_paths:
             parent = submission_path.parent
             grandparent = parent.parent
-
-            #print(f"Processing submission: {submission_path}")
 
             if parent.name.endswith("-submissions"):
                 assignment_slug = parent.name.replace("-submissions", "")
@@ -216,18 +220,12 @@ class Submission:
                     new_parent.mkdir(parents=True, exist_ok=True)
                     new_path = new_parent / github_name
 
-                    #print(f"Old path: {submission_path}")
-                    #print(f"New path: {new_path}")
-
                     if not new_path.exists():
                         try:
                             shutil.move(str(submission_path), str(new_path))
-                            print(f"Moved from {submission_path} to {new_path}")
                             moved_parents.add(parent)
                         except Exception as e:
                             print(f"Move failed for {github_name}: {e}")
-                    else:
-                        print(f"Repo already exists at {new_path}")
 
                     repo = Repository(new_path)
                     repos.append(repo)
@@ -239,26 +237,14 @@ class Submission:
                 repos.append(repo)
 
         # Clean up old '-submissions' directories if empty
-        print(f"Parents to remove: {moved_parents}")
         for parent in moved_parents:
             if parent.exists() and not any(parent.iterdir()):
                 try:
                     parent.rmdir()
-                    print(f"Deleted empty directory: {parent}")
                 except OSError as e:
                     print(f"Failed to delete {parent}: {e}")
 
-        # 🚮 Catch-all: Remove any remaining '-submissions' directories
-        for folder in grandparent.glob("*-submissions"):
-            if folder.is_dir() and not any(folder.iterdir()):
-                try:
-                    folder.rmdir()
-                    print(f"🗑️ Deleted catch-all '-submissions' folder: {folder}")
-                except OSError as e:
-                    print(f"❌ Failed to delete catch-all folder {folder}: {e}")
-
         return tuple(repos)
-
 
 
     def _restore_tests(self) -> None:
