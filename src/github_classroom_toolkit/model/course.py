@@ -1,4 +1,6 @@
-import subprocess
+import os
+import shutil
+import time
 from dataclasses import dataclass
 from functools import cache, cached_property
 from os import rename, rmdir
@@ -154,7 +156,7 @@ class Submission:
         """
         Automatically clone student repositories using the gh classroom command.
         Student repositories are cloned into an assignment directory
-        inside the `base_dir of the classroom the assignment belongs to.
+        inside the base_dir of the classroom the assignment belongs to.
 
         :param assignment: The assignment to clone submission repos for.
         :raise CalledProcessError: If the command fails.
@@ -162,84 +164,101 @@ class Submission:
         """
         base_dir = assignment.classroom.base_dir / assignment.slug
         print(base_dir)
-        #base_dir.mkdir(parents=True, exist_ok=True)
 
         submission_paths = []
 
 
         if base_dir.is_dir() and set(base_dir.iterdir()) == {base_dir / "_starter-code"}:
+            print("Cloning all Repositories.")
             stdout = get_stdout("gh", "classroom", "clone", "student-repos",
                                 "-a", assignment.id, "-d", assignment.classroom.base_dir)
             submission_paths = parse_cloned_paths(stdout)
-            print("All repos cloned!")
 
-        for _, row in assignment.grades.iterrows():
-            gh_name = row["github_username"]
-            repo_url = row["student_repository_url"]
-            target = base_dir / gh_name
+        else:
+            for _, row in assignment.grades.iterrows():
+                gh_name = row["github_username"]
+                repo_url = row["student_repository_url"]
+                target = base_dir / gh_name
 
-            if target.is_dir():
-                submission_paths.append(target)
-                continue
-            try:
-                subprocess.run(["gh", "repo", "clone", repo_url, str(target)], check=True, text=True, capture_output=True)
                 if target.is_dir():
                     submission_paths.append(target)
-            except subprocess.CalledProcessError as e:
-                print(f"Error cloning repo for {gh_name}: {e.stderr}")
-                continue
-            except Exception as e:
-                print(f"Unexpected error while cloning {gh_name}: {e}")
-                continue
+                    continue
+                try:
+                    print(f"Cloning Repository for {gh_name}.")
+                    run(["gh", "repo", "clone", repo_url, str(target)], check=True, text=True, capture_output=True)
+                    if target.is_dir():
+                        submission_paths.append(target)
+                    continue
+                except Exception as e:
+                    print(f"Unexpected error while cloning {gh_name}: {e}")
+                    continue
 
         return tuple(submission_paths)
 
 
     @staticmethod
     def _rename_repos(submission_paths: Collection[Path]) -> tuple[Repository, ...]:
-        """
-        Rename the base folder from ``{assignment_slug}-submissions`` to ``{assignment_slug}``
-        and each repo from ``{assignment_slug}-{student_name} to ``{student_name}``.
-
-        :param submission_paths: A collection of paths pointing to the submitted repositories.
-        :return: A tuple of :class:`Repository` objects pointing to the renamed submissions.
-        """
-        submission_path = None  # init submission_path for the else branch
         repos = []
+        moved_parents = set()
+
         for submission_path in submission_paths:
             parent = submission_path.parent
             grandparent = parent.parent
 
+            #print(f"Processing submission: {submission_path}")
+
             if parent.name.endswith("-submissions"):
                 assignment_slug = parent.name.replace("-submissions", "")
 
-                if submission_path.name.startswith(f"{assignment_slug}"):
+                if submission_path.name.startswith(f"{assignment_slug}-"):
                     github_name = submission_path.name[len(f"{assignment_slug}-"):]
-
                     new_parent = grandparent / assignment_slug
                     new_parent.mkdir(parents=True, exist_ok=True)
                     new_path = new_parent / github_name
 
+                    #print(f"Old path: {submission_path}")
+                    #print(f"New path: {new_path}")
+
                     if not new_path.exists():
-                        rename(submission_path, new_path)
+                        try:
+                            shutil.move(str(submission_path), str(new_path))
+                            print(f"Moved from {submission_path} to {new_path}")
+                            moved_parents.add(parent)
+                        except Exception as e:
+                            print(f"Move failed for {github_name}: {e}")
                     else:
-                        # turn the path into a repository
-                        repo = Repository(new_path)
-                        repos.append(repo)
+                        print(f"Repo already exists at {new_path}")
+
+                    repo = Repository(new_path)
+                    repos.append(repo)
                 else:
                     repo = Repository(submission_path)
                     repos.append(repo)
-
             else:
                 repo = Repository(submission_path)
                 repos.append(repo)
-        # clean up old assignment directory in the end
-        for submission_path in submission_paths:
-            parent = submission_path.parent
-            if parent.name.endswith("-submissions") and not any(parent.iterdir()):
-                rmdir(parent)
+
+        # Clean up old '-submissions' directories if empty
+        print(f"Parents to remove: {moved_parents}")
+        for parent in moved_parents:
+            if parent.exists() and not any(parent.iterdir()):
+                try:
+                    parent.rmdir()
+                    print(f"Deleted empty directory: {parent}")
+                except OSError as e:
+                    print(f"Failed to delete {parent}: {e}")
+
+        # 🚮 Catch-all: Remove any remaining '-submissions' directories
+        for folder in grandparent.glob("*-submissions"):
+            if folder.is_dir() and not any(folder.iterdir()):
+                try:
+                    folder.rmdir()
+                    print(f"🗑️ Deleted catch-all '-submissions' folder: {folder}")
+                except OSError as e:
+                    print(f"❌ Failed to delete catch-all folder {folder}: {e}")
 
         return tuple(repos)
+
 
 
     def _restore_tests(self) -> None:
