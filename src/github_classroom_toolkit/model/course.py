@@ -1,7 +1,7 @@
-import shutil
 from dataclasses import dataclass
 from functools import cache, cached_property
 from pathlib import Path
+from shutil import move, Error as ShutilError
 from subprocess import CompletedProcess, run, CalledProcessError
 from typing import ClassVar, Collection, Self
 from xml.etree import ElementTree as ET
@@ -205,44 +205,46 @@ class Submission:
         """
 
         repos = []
-        moved_parents = set()
+        moved_parents = set()  # needed later for cleanup
 
         for submission_path in submission_paths:
-            parent = submission_path.parent
-            grandparent = parent.parent
+            assignment_dir = submission_path.parent
+            base_dir = assignment_dir.parent
 
-            if parent.name.endswith("-submissions"):
-                assignment_slug = parent.name.replace("-submissions", "")
-
-                if submission_path.name.startswith(f"{assignment_slug}-"):
-                    github_name = submission_path.name[len(f"{assignment_slug}-"):]
-                    new_parent = grandparent / assignment_slug
-                    new_parent.mkdir(parents=True, exist_ok=True)
-                    new_path = new_parent / github_name
-
-                    if not new_path.exists():
-                        try:
-                            shutil.move(str(submission_path), str(new_path))
-                            moved_parents.add(parent)
-                        except Exception as e:
-                            print(f"Move failed for {github_name}: {e}")
-
-                    repo = Repository(new_path)
-                    repos.append(repo)
-                else:
-                    repo = Repository(submission_path)
-                    repos.append(repo)
+            if assignment_dir.name.endswith("-submissions"):
+                # remove `-submissions` from the end
+                assignment_slug = assignment_dir.name[:len("-submissions")]
             else:
+                assignment_slug = assignment_dir.name
+
+            # skip renaming properly named repos
+            if not submission_path.name.startswith(f"{assignment_slug}-"):
                 repo = Repository(submission_path)
                 repos.append(repo)
+                continue
+
+            # remove `<assignment_slug>-` from the start
+            github_name = submission_path.name[len(f"{assignment_slug}-"):]
+            new_parent = base_dir / assignment_slug
+            new_parent.mkdir(parents=True, exist_ok=True)
+            new_path = new_parent / github_name
+
+            if not new_path.exists():
+                try:
+                    move(str(submission_path), str(new_path))
+                    moved_parents.add(assignment_dir)
+                except (FileExistsError, ShutilError) as e:
+                    raise RuntimeError(f"Move failed for {github_name}") from e
+
+            repo = Repository(new_path)
+            repos.append(repo)
 
         # Clean up old '-submissions' directories if empty
-        for parent in moved_parents:
-            if parent.exists() and not any(parent.iterdir()):
-                try:
-                    parent.rmdir()
-                except OSError as e:
-                    print(f"Failed to delete {parent}: {e}")
+        for assignment_dir in moved_parents:
+            try:
+                assignment_dir.rmdir()
+            except OSError as e:
+                raise RuntimeError(f"Failed to delete {assignment_dir}") from e
 
         return tuple(repos)
 
