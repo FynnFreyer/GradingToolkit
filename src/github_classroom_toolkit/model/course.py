@@ -165,13 +165,13 @@ class Submission:
         base_dir = assignment.classroom.base_dir / assignment.slug
         submission_paths = []
 
-        # Clone all repositories of one assignment when the assignment directory is empty except of the starter code
+        # Clone all repositories of one assignment if directory doesn't contain student repos
         if base_dir.is_dir() and set(base_dir.iterdir()) == {base_dir / "_starter-code"}:
             stdout = get_stdout("gh", "classroom", "clone", "student-repos",
                                 "-a", assignment.id, "-d", assignment.classroom.base_dir)
             submission_paths = parse_cloned_paths(stdout)
 
-        # Clone only repositories that don't exist
+        # Clone only repositories that don't exist in the assignment-folder
         else:
             for _, row in assignment.grades.iterrows():
                 gh_name = row["github_username"]
@@ -186,10 +186,8 @@ class Submission:
                     run(["gh", "repo", "clone", repo_url, str(target)], check=True, text=True, capture_output=True)
                     if target.is_dir():
                         submission_paths.append(target)
-                    continue
                 except Exception as e:
                     print(f"Unexpected error while cloning {gh_name}: {e}")
-                    continue
 
         return tuple(submission_paths)
 
