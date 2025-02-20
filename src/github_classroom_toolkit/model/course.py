@@ -1,11 +1,8 @@
-import os
 import shutil
-import time
 from dataclasses import dataclass
 from functools import cache, cached_property
-from os import rename, rmdir
 from pathlib import Path
-from subprocess import CompletedProcess, run
+from subprocess import CompletedProcess, run, CalledProcessError
 from typing import ClassVar, Collection, Self
 from xml.etree import ElementTree as ET
 
@@ -162,32 +159,37 @@ class Submission:
         :raise CalledProcessError: If the command fails.
         :return: A tuple of paths pointing to the downloaded submissions.
         """
-        base_dir = assignment.classroom.base_dir / assignment.slug
+        assignment_dir = assignment.classroom.base_dir / assignment.slug
+        assignment_dir.mkdir(parents=True, exist_ok=True)
         submission_paths = []
 
         # Clone all repositories of one assignment if directory doesn't contain student repos
-        if base_dir.is_dir() and set(base_dir.iterdir()) == {base_dir / "_starter-code"}:
+        only_starter_code = set(assignment_dir.iterdir()) == {assignment_dir / "_starter-code"}
+        if only_starter_code:
+            # produces directory with `-submission` suffix
             stdout = get_stdout("gh", "classroom", "clone", "student-repos",
                                 "-a", assignment.id, "-d", assignment.classroom.base_dir)
             submission_paths = parse_cloned_paths(stdout)
+            return tuple(submission_paths)
 
         # Clone only repositories that don't exist in the assignment-folder
-        else:
-            for _, row in assignment.grades.iterrows():
-                gh_name = row["github_username"]
-                repo_url = row["student_repository_url"]
-                target = base_dir / gh_name
+        for _, row in assignment.grades.iterrows():
+            gh_name = row["github_username"]
+            repo_url = row["student_repository_url"]
+            target = assignment_dir / gh_name
 
-                if target.is_dir():
-                    #run(["git", "fetch", "--all"])  # TODO replace with desired git command (slow)
-                    submission_paths.append(target)
-                    continue
-                try:
-                    run(["gh", "repo", "clone", repo_url, str(target)], check=True, text=True, capture_output=True)
-                    if target.is_dir():
-                        submission_paths.append(target)
-                except Exception as e:
-                    print(f"Unexpected error while cloning {gh_name}: {e}")
+            # Skip existing submissions
+            if target.is_dir():
+                #run(["git", "fetch", "--all"])  # TODO replace with desired git command (slow)
+                submission_paths.append(target)
+                continue
+
+            # Clone single non existing repository
+            try:
+                run(["gh", "repo", "clone", repo_url, str(target)], check=True)
+                submission_paths.append(target)
+            except CalledProcessError as e:
+                raise RuntimeError(f"Unexpected error while cloning {gh_name}") from e
 
         return tuple(submission_paths)
 
