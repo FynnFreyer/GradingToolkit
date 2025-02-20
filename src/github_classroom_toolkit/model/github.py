@@ -157,6 +157,7 @@ class Assignment:
         :raise CalledProcessError: If the ``gh clone`` command fails.
         :return: A :class:`~github_classroom_toolkit.model.git.Repository` containing the assignments starter code.
         """
+
         with TemporaryDirectory() as tmp:
             # clone the starter code repo to a temp dir
             stdout = get_stdout("gh", "classroom", "clone", "starter-repo", "-a", self.id, "-d", tmp)
@@ -173,6 +174,7 @@ class Assignment:
 
             # construct the destination path and move the repo
             dest_path = assignment_dir / "_starter-code"
-            move(starter_code_path, dest_path)
+            if not dest_path.is_dir():
+                move(starter_code_path, dest_path)
 
             return Repository(dest_path)
