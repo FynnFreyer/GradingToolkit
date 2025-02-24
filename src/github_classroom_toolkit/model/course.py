@@ -188,7 +188,6 @@ class Submission:
                 submission_paths.append(target)
             except CalledProcessError as e:
                 raise RuntimeError(f"Unexpected error while cloning {gh_name}") from e
-
         return tuple(submission_paths)
 
     @staticmethod
@@ -203,14 +202,13 @@ class Submission:
 
         repos = []
         moved_parents = set()  # needed later for cleanup
-
         for submission_path in submission_paths:
             assignment_dir = submission_path.parent
             base_dir = assignment_dir.parent
 
             if assignment_dir.name.endswith("-submissions"):
                 # remove `-submissions` from the end
-                assignment_slug = assignment_dir.name[:len("-submissions")]
+                assignment_slug = assignment_dir.name.removesuffix("-submissions")
             else:
                 assignment_slug = assignment_dir.name
 
