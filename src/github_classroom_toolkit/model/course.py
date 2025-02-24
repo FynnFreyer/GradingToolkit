@@ -1,3 +1,4 @@
+import shutil
 from dataclasses import dataclass
 from functools import cache, cached_property
 from pathlib import Path
@@ -144,6 +145,7 @@ class Submission:
                 print(f"Couldn't find student: {github_name}")
                 continue
             submission = cls(assignment, student, repo)
+            submission._restore_tests()
             submissions.append(submission)
         return tuple(submissions)
 
@@ -188,6 +190,7 @@ class Submission:
                 submission_paths.append(target)
             except CalledProcessError as e:
                 raise RuntimeError(f"Unexpected error while cloning {gh_name}") from e
+
         return tuple(submission_paths)
 
     @staticmethod
@@ -245,7 +248,22 @@ class Submission:
 
     def _restore_tests(self) -> None:
         """Restore the contents of ``src/test/`` to the contents of the starter code repository for this assignment."""
-        raise NotImplementedError
+        # path to the starter code test folder
+        starter_test_dir = self.repo.path.parent / "_starter-code" / "src/test/java"
+
+        if not starter_test_dir.exists():
+            raise RuntimeError(f"Starter test directory does not exist: {starter_test_dir}")
+
+        # path to student's test folder
+        student_test_dir = self.repo.path / "src/test/java"
+
+        # remove student's test directory
+        if student_test_dir.exists():
+            shutil.rmtree(student_test_dir)
+
+        # copy starter test files into student's repository
+        shutil.copytree(starter_test_dir, student_test_dir)
+
 
 
 @dataclass(frozen=True)
