@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Sequence
 
-from github_classroom_toolkit.model.course import Student, Submission
+from github_classroom_toolkit.model.course import Student, Submission, Grade
 from github_classroom_toolkit.model.github import Classroom
 
 
@@ -29,7 +29,21 @@ def main(args: Namespace | None = None):
         for assignment in classroom.assignments
     }
 
-    print(submission_lists, students)
+    # run tests for all submissions
+    Grade.test_submissions()
+
+    # collect results
+    grades = {}
+    for assignment, submissions in submission_lists.items():
+        test_results = Grade.find_test_xmls(submissions)
+        for submission, test_files in test_results.items():
+            grade = Grade.from_test_xmls(submission, test_files)
+            grades[submission] = grade
+
+
+    # for submssion, grade in grades.items():
+    #     print(f"{submssion.student.github_name}: {grade.points_received}/{grade.points_available} "
+    #           f"({grade.percentage:.2%}) - {'PASS' if grade.is_passing_grade else 'FAIL'}")
 
 
 if __name__ == "__main__":
