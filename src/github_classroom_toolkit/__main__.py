@@ -36,14 +36,19 @@ def main(args: Namespace | None = None):
     grades = {}
     for assignment, submissions in submission_lists.items():
         test_results = Grade.find_test_xmls(submissions)
-        for submission, test_files in test_results.items():
-            grade = Grade.from_test_xmls(submission, test_files)
-            grades[submission] = grade
 
+        for submission in submissions:
+            test_files = test_results.get(submission, [])
+            if not test_files:
+                print(f"No results for {submission.student.github_name} ({assignment.slug})")
+                continue
+            grades[submission] = Grade.from_test_xmls(submission, test_files)
 
-    # for submssion, grade in grades.items():
-    #     print(f"{submssion.student.github_name}: {grade.points_received}/{grade.points_available} "
-    #           f"({grade.percentage:.2%}) - {'PASS' if grade.is_passing_grade else 'FAIL'}")
+    # Print grades summary TODO write in csv
+    for submission, grade in grades.items():
+        print(f"{submission.student.github_name} - {submission.assignment.slug}: "
+              f"{grade.points_received}/{grade.points_available} "
+              f"({grade.percentage:.2%}) - {'PASS' if grade.is_passing_grade else 'FAIL'}")
 
 
 if __name__ == "__main__":

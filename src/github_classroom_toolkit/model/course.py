@@ -287,45 +287,31 @@ class Grade:
         :param submissions: Collection of Submission objects
         :return: Dictionary mapping each submission to its corresponding test result files
         """
+
         aggregate_dir = Path("build/reports/aggregate")
         test_file_map = {}
-        for submission in submissions:
-            student_folder = aggregate_dir / submission.student.github_name
-            if not student_folder.exists():
-                print(f"Warning: No test results found for {submission.student.github_name}")
-                continue
 
-            test_results = list(student_folder.glob(f"{submission.assignment.slug}_TEST-*.xml"))
+        assignment_map = {submission.assignment.slug : submission.assignment for submission in submissions}
+        user_map = {submission.student.github_name : submission.student for submission in submissions}
 
-            if test_results:
-                test_file_map[submission] = tuple(test_results)
+        test_results = list(aggregate_dir.glob(f"*/{submissions[0].assignment.slug}_TEST-*.xml"))
 
-        return test_file_map
+        for result in test_results:
+            account_name = result.parent.name
+            user = user_map.get(account_name)
 
-        #test_results = list(aggregate_dir.glob(f"*/{submissions[0].assignment.slug}_TEST-*.xml"))
+            assignment_name, _test_name = result.name.split("_TEST-")
+            assignment = assignment_map.get(assignment_name)
 
-        # assignment_map = {}
-        # user_map = {}
-        # test_file_map = {
-        #     user: {
-        #         assignment: []
-        #         for assignment
-        #         in assignment_map.values()
-        #     }
-        #     for user
-        #     in user_map.values()
-        # }
-        #
-        # for result in test_results:
-        #     account_name = result.parent.name
-        #     user = user_map.get(account_name)
-        #
-        #     assignment_name, _test_name = result.name.split("_TEST-")
-        #     assignment = assignment_map.get(assignment_name)
-        #
-        #     test_file_map.get(user, dict()).get(assignment, list()).append(result)
-        #
-        # return {}
+            matching_submission = next(
+                (s for s in submissions if s.student == user and s.assignment == assignment), None
+            )
+
+            if matching_submission:
+                test_file_map.setdefault(matching_submission, []).append(result)
+
+        return {submission: tuple(files) for submission, files in test_file_map.items()}
+
 
     @classmethod
     def from_test_xmls(cls, submission: Submission, test_xmls: Collection[str | Path]) -> Self:
