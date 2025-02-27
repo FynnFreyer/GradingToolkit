@@ -264,20 +264,49 @@ class Submission:
 
 @dataclass(frozen=True)
 class Grade:
+    """
+    Represents the grade for a student's assignment submission.
+
+    This class stores information about a student's submission, including the total points available
+    and the points received. It also provides utility properties to compute the percentage score
+    and determine whether the grade is passing.
+
+    Attributes:
+        submission (Submission): The student's submission associated with this grade.
+        points_available (int): The total number of points possible for the assignment.
+        points_received (int): The number of points the student earned.
+    """
     submission: Submission
     points_available: int
     points_received: int
 
     @cached_property
     def percentage(self) -> float:
+        """
+        Computes the percentage score for the submission.
+
+        :return: The percentage of points received out of points available.
+        """
         return self.points_received / self.points_available
 
     @cached_property
     def is_passing_grade(self) -> bool:
+        """
+        Determines whether the grade is passing.
+
+        A passing grade is defined as earning at least 50% of the available points.
+
+        :return: True if the percentage is 50% or higher, otherwise False.
+        """
         return self.percentage >= 0.5
 
     @staticmethod
     def test_submissions() -> CompletedProcess:
+        """
+        Runs the test suite for all student submissions using Gradle.
+
+        :return: A CompletedProcess object containing the results of the Gradle command execution.
+        """
         return run(["./gradlew", "test", "aggregate", "--info"], check=True)
 
     @staticmethod
@@ -287,13 +316,14 @@ class Grade:
         :param submissions: Collection of Submission objects
         :return: Dictionary mapping each submission to its corresponding test result files
         """
-
-        aggregate_dir = Path("build/reports/aggregate")
+        aggregate_dir = Path("build/reports/aggregate")  # Path with result xml files
         test_file_map = {}
 
+        # maps to keep track of assignments and users
         assignment_map = {submission.assignment.slug : submission.assignment for submission in submissions}
         user_map = {submission.student.github_name : submission.student for submission in submissions}
 
+        # iterate over all potential test result files
         test_results = list(aggregate_dir.glob(f"*/{submissions[0].assignment.slug}_TEST-*.xml"))
 
         for result in test_results:
@@ -303,6 +333,7 @@ class Grade:
             assignment_name, _test_name = result.name.split("_TEST-")
             assignment = assignment_map.get(assignment_name)
 
+            # Find corresponding submission
             matching_submission = next(
                 (s for s in submissions if s.student == user and s.assignment == assignment), None
             )
@@ -310,11 +341,27 @@ class Grade:
             if matching_submission:
                 test_file_map.setdefault(matching_submission, []).append(result)
 
+        # Convert lists to tuples
         return {submission: tuple(files) for submission, files in test_file_map.items()}
 
 
     @classmethod
     def from_test_xmls(cls, submission: Submission, test_xmls: Collection[str | Path]) -> Self:
+        """
+        Creates a Grade object by parsing test result XML files.
+
+        This method processes multiple test XML files to determine the total points available and
+        points received by a student's submission. It extracts test statistics such as the number
+        of tests run, skipped tests, failures, and errors to compute the final grade.
+
+        :param submission: The Submission object associated with the test results.
+        :param test_xmls: A collection of file paths (or strings representing paths) to the test result XML files.
+        :return: A Grade object containing the calculated points.
+
+        The grading calculation follows this logic:
+        - Total available points = Total tests - Skipped tests
+        - Total received points = Available points - (Failures + Errors)
+        """
         points_available = 0
         points_received = 0
         for test_xml in test_xmls:
