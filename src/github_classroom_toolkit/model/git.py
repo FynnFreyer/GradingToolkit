@@ -29,7 +29,11 @@ class Repository:
         # ensure that paths are resolved and point to a directory
         object.__setattr__(self, "path", self.path.resolve(strict=True))
         if not self.path.is_dir():
-            raise ValueError("Path is not a directory.")
+            raise NotADirectoryError("Path is not a directory.")
+        # ensure that path points to a git repo
+        git_dir = self.path / ".git"
+        if not git_dir.is_dir():
+            raise ValueError("Path does not point to a git repository.")
 
     @cached_property
     def origin(self) -> str:
