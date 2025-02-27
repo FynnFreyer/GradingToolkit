@@ -59,11 +59,9 @@ def parse_grades_csvs(paths: list[str | Path] | None = None) -> DataFrame:
     :param paths: List of paths to ``grades.csv`` files.
     :return: The relevant data, loaded into a dataframe.
     """
-    if paths is not None:
-        paths = [Path(p) for p in paths]
-    else:
+    if paths is None:
         paths = list(Path().glob("*grades*.csv"))
-    paths = [p.resolve() for p in paths]
+    paths = [Path(p).resolve() for p in paths]
 
     return concat([parse_grades_csv(path) for path in paths])
 
