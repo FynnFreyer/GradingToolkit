@@ -14,7 +14,7 @@ from github_classroom_toolkit.__about__ import __authors__, __project_name__, __
 # format author information
 author_names = [author["name"] for author in __authors__]
 authors_plain = "; ".join(author_names)
-authors_latex = r"\and ".join(author_names)
+authors_latex = r" \and ".join(author_names)
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
