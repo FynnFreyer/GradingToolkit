@@ -120,6 +120,10 @@ class Submission:
     """Where the tests reside. Used for restoring tests."""
 
     def __post_init__(self):
+        # ensure that latest commit pre deadline is checked out
+        if self.assignment.deadline:
+            commit_hash = self.repo.get_latest_commit_hash(self.assignment.deadline)
+            self.repo.checkout(commit_hash)
         # ensure that tests are restored to repo
         self._restore_tests()
 
