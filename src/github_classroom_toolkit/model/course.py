@@ -116,6 +116,13 @@ class Submission:
     repo: Repository
     """The :class:`~github_classroom_toolkit.model.git.Repository` that contains the submitted work."""
 
+    test_location: ClassVar[str] = "src/test/java"
+    """Where the tests reside. Used for restoring tests."""
+
+    def __post_init__(self):
+        # ensure that tests are restored to repo
+        self._restore_tests()
+
     @classmethod
     @cache
     def from_assignment(cls, assignment: Assignment) -> tuple[Self, ...]:
@@ -141,7 +148,6 @@ class Submission:
                 print(f"Couldn't find student: {github_name}")
                 continue
             submission = cls(assignment, student, repo)
-            submission._restore_tests()
             submissions.append(submission)
         return tuple(submissions)
 
@@ -243,15 +249,20 @@ class Submission:
         return tuple(repos)
 
     def _restore_tests(self) -> None:
-        """Restore the contents of ``src/test/`` to the contents of the starter code repository for this assignment."""
+        """
+        Restore the tests in :attr:`test_location` to the contents of the starter code repository.
+
+        :raise RuntimeError: If test directory doesn't exist.
+        :return: Nothing.
+        """
         # path to the starter code test folder
-        starter_test_dir = self.repo.path.parent / "_starter-code" / "src/test/java"
+        starter_test_dir = self.assignment.starter_code.path / self.test_location
 
         if not starter_test_dir.exists():
             raise RuntimeError(f"Starter test directory does not exist: {starter_test_dir}")
 
         # path to student's test folder
-        student_test_dir = self.repo.path / "src/test/java"
+        student_test_dir = self.repo.path / self.test_location
 
         # remove student's test directory
         if student_test_dir.exists():
@@ -259,7 +270,6 @@ class Submission:
 
         # copy starter test files into student's repository
         shutil.copytree(starter_test_dir, student_test_dir)
-
 
 
 @dataclass(frozen=True)
@@ -316,34 +326,22 @@ class Grade:
         :param submissions: Collection of Submission objects
         :return: Dictionary mapping each submission to its corresponding test result files
         """
-        aggregate_dir = Path("build/reports/aggregate")  # Path with result xml files
+        # Path with result xml files
+        # folder structure is {user}/{assignment.slug}_Test-{tested_class}.xml
+        aggregate_dir = Path("build/reports/aggregate")
+        # holds results
         test_file_map = {}
 
-        # maps to keep track of assignments and users
-        assignment_map = {submission.assignment.slug : submission.assignment for submission in submissions}
-        user_map = {submission.student.github_name : submission.student for submission in submissions}
+        for submission in submissions:
+            student = submission.student
+            assignment = submission.assignment
 
-        # iterate over all potential test result files
-        test_results = list(aggregate_dir.glob(f"*/{submissions[0].assignment.slug}_TEST-*.xml"))
-
-        for result in test_results:
-            account_name = result.parent.name
-            user = user_map.get(account_name)
-
-            assignment_name, _test_name = result.name.split("_TEST-")
-            assignment = assignment_map.get(assignment_name)
-
-            # Find corresponding submission
-            matching_submission = next(
-                (s for s in submissions if s.student == user and s.assignment == assignment), None
-            )
-
-            if matching_submission:
-                test_file_map.setdefault(matching_submission, []).append(result)
+            # find all test result files for this submission
+            submission_test_results = tuple(aggregate_dir.glob(f"{student.github_name}/{assignment.slug}_TEST-*.xml"))
+            test_file_map[submission] = submission_test_results
 
         # Convert lists to tuples
-        return {submission: tuple(files) for submission, files in test_file_map.items()}
-
+        return test_file_map
 
     @classmethod
     def from_test_xmls(cls, submission: Submission, test_xmls: Collection[str | Path]) -> Self:
@@ -354,13 +352,13 @@ class Grade:
         points received by a student's submission. It extracts test statistics such as the number
         of tests run, skipped tests, failures, and errors to compute the final grade.
 
+        The grading calculation follows this logic:
+        * Total available points = Total tests - Skipped tests
+        * Total received points = Available points - (Failures + Errors)
+
         :param submission: The Submission object associated with the test results.
         :param test_xmls: A collection of file paths (or strings representing paths) to the test result XML files.
         :return: A Grade object containing the calculated points.
-
-        The grading calculation follows this logic:
-        - Total available points = Total tests - Skipped tests
-        - Total received points = Available points - (Failures + Errors)
         """
         points_available = 0
         points_received = 0
