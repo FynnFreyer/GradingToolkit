@@ -28,11 +28,6 @@ def main(args: Namespace | None = None):
 
     grades = course.grade_submissions()
 
-    # Print grades summary TODO write in csv
-    for submission, grade in grades.items():
-        print(f"{submission.student.github_name} - {submission.assignment.slug}: "
-              f"{grade.points_received}/{grade.points_available} "
-              f"({grade.percentage:.2%}) - {'PASS' if grade.is_passing_grade else 'FAIL'}")
 
 
 if __name__ == "__main__":

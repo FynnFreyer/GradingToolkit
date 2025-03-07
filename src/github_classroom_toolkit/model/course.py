@@ -1,12 +1,15 @@
 import shutil
 from dataclasses import dataclass
 from functools import cache, cached_property, total_ordering
+from os import write
 from pathlib import Path
 from shutil import move, Error as ShutilError
 from subprocess import CompletedProcess, run, CalledProcessError
 from typing import ClassVar, Collection, Self
 from xml.etree import ElementTree as ET
 
+import pandas as pd
+from mypy.memprofile import defaultdict
 from pandas import read_csv
 
 from github_classroom_toolkit.model.git import Repository
@@ -61,7 +64,65 @@ class Course:
                     print(f"No results for {submission.student.github_name} ({assignment.slug})")
                     continue
                 grades[submission] = Grade.from_test_xmls(submission, test_files)
-        return grades
+
+        self.write_grades_to_csv(grades, "all_grades.csv")
+
+    def write_grades_to_csv(self, grades : dict, output_file: str):
+        """
+        Writes submissions to a CSV file.
+
+        :param grades: A dict of calculated Grade objects
+        :param output_file: Path to save the CSV file
+        :return: Nothing
+        """
+
+        student_data = defaultdict(lambda: {"Points achieved (Total)": 0, "Points available (Total)": 0})
+        all_assignments = set(submission.assignment.slug for submission in grades.keys())
+
+        for submission, grade in grades.items():
+            student_key = submission.student.github_name
+
+            student_data[student_key].update({
+                "Github name": submission.student.github_name,
+                "Last name": submission.student.last_name,
+                "First name": submission.student.first_name
+            })
+
+            student_data[student_key][f"{submission.assignment.slug} (Achieved)"] = grade.points_received
+            student_data[student_key][f"{submission.assignment.slug} (Available)"] = grade.points_available
+            student_data[student_key][f"{submission.assignment.slug} (%)"] = round(grade.percentage*100, 2)
+
+            # Update total scores
+            student_data[student_key]["Points achieved (Total)"] += grade.points_received
+            student_data[student_key]["Points available (Total)"] += grade.points_available
+
+        for student in student_data.values():
+            for assignment in all_assignments:
+                student.setdefault(f"{assignment} (Achieved)", 0)
+                student.setdefault(f"{assignment} (%)", 0.0)
+
+        for student in student_data.values():
+            if student["Points available (Total)"] > 0:
+                student["Percentage (Total)"] = round(
+                    (student["Points achieved (Total)"] / student["Points available (Total)"]) * 100, 2
+                )
+            else:
+                student["Percentage (Total)"] = 0.0
+
+            df = pd.DataFrame(student_data.values())
+
+            ordered_columns = (
+                ["Github name", "Last name", "First name"] +
+                [col for assignment in all_assignments for col in
+                 (f"{assignment} (Achieved)", f"{assignment} (Available)", f"{assignment} (%)")] +
+                ["Points achieved (Total)", "Points available (Total)", "Percentage (Total)"]
+            )
+
+            df = df[ordered_columns]
+
+            df.to_csv(output_file, index=False)
+
+
 
 
 @total_ordering
