@@ -104,8 +104,9 @@ class Assignment:
     """A :class:`~github_classroom_toolkit.model.git.Repository` containing the starter code for this assignment."""
 
     def __post_init__(self):
-        # download the starter code repository
-        object.__setattr__(self, "starter_code", self._clone_starter_code())
+        # download the starter code repository if not yet set
+        if self.starter_code is None:
+            object.__setattr__(self, "starter_code", self._clone_starter_code())
 
     @property
     def slug(self) -> str:
