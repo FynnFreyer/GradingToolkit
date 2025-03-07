@@ -79,7 +79,7 @@ class Repository:
             deadline = f"--before='{deadline.isoformat()}'"
 
         with directory(self.path):
-            return get_stdout("git", "log", branch, deadline, "-n", 1, "--format='%H'")
+            return get_stdout("git", "log", branch, deadline, "-n", 1, "--format=%H")
 
     def checkout(self, branch_or_commit: str = "main") -> CompletedProcess:
         """
