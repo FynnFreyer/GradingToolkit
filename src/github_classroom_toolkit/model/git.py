@@ -26,8 +26,9 @@ class Repository:
     """The directory path of the repository."""
 
     def __post_init__(self):
-        # ensure that paths are resolved and point to a directory
-        object.__setattr__(self, "path", self.path.resolve(strict=True))
+        # ensure that paths are resolved path objects and point to a directory
+        path = Path(self.path).resolve(strict=True)
+        object.__setattr__(self, "path", path)
         if not self.path.is_dir():
             raise NotADirectoryError("Path is not a directory.")
         # ensure that path points to a git repo
