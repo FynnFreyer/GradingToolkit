@@ -33,11 +33,35 @@ class Course:
     @cache
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
         """
-
-        :param classroom_id:
-        :param students_csv:
-        :return:
+        Creates a Course instance from a Github Classroom ID and CSV file of students.
+        :param classroom_id: ID of the Github Classroom
+        :param students_csv: Path to a CSV containing student information
+        :return: A Course object
         """
+
+        classroom = Classroom.from_id(classroom_id)
+        students = Student.from_student_data(students_csv)
+        return cls(classroom, students)
+
+    def grade_submissions(self): # -> dict[Submission, Grade]: wirft fehler, den ich nicht versehe
+        submission_lists = {
+            assignment : Submission.from_assignment(assignment)
+            for assignment in self.classroom.assignments
+        }
+
+        Grade.test_submissions()
+
+        grades = {}
+        for assignment, submissions in submission_lists.items():
+            test_results = Grade.find_test_xmls(submissions)
+
+            for submission in submissions:
+                test_files = test_results.get(submission, [])
+                if not test_files:
+                    print(f"No results for {submission.student.github_name} ({assignment.slug})")
+                    continue
+                grades[submission] = Grade.from_test_xmls(submission, test_files)
+        return grades
 
 
 @total_ordering
@@ -132,7 +156,7 @@ class Submission:
         # ensure that latest commit pre deadline is checked out
         if self.assignment.deadline:
             commit_hash = self.repo.get_latest_commit_hash(self.assignment.deadline)
-            self.repo.checkout(commit_hash)
+            #self.repo.checkout(commit_hash)
         # ensure that tests are restored to repo
         self._restore_tests()
 
