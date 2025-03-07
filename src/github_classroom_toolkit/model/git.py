@@ -89,4 +89,4 @@ class Repository:
         :return: Nothing.
         """
         with directory(self.path):
-            return run(["git", "checkout", branch_or_commit], check=True)
+            return run(["git", "checkout", branch_or_commit], check=True, capture_output=True)
