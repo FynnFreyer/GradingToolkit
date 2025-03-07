@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cache, cached_property
 from pathlib import Path
@@ -28,14 +28,8 @@ class Classroom:
     url: str
     """The URL of this classroom."""
 
-    base_dir: Path = None
+    base_dir: Path = field(default_factory=lambda: Path("repos").resolve())
     """The directory to use for storing starter code and submissions for assigned work."""
-
-    def __post_init__(self):
-        # TODO: doing this here seems super clumsy and like a bad idea in general
-        # ensure that the classroom has a base directory to clone assignment data into
-        object.__setattr__(self, "base_dir", Path("repos").resolve())
-        self.base_dir.mkdir(exist_ok=True)
 
     @property
     def slug(self) -> str:
