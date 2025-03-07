@@ -1,6 +1,6 @@
 import shutil
 from dataclasses import dataclass
-from functools import cache, cached_property
+from functools import cache, cached_property, total_ordering
 from pathlib import Path
 from shutil import move, Error as ShutilError
 from subprocess import CompletedProcess, run, CalledProcessError
@@ -40,6 +40,7 @@ class Course:
         """
 
 
+@total_ordering
 @dataclass(frozen=True)
 class Student:
     """A student of the course."""
@@ -62,6 +63,14 @@ class Student:
     def __post_init__(self):
         # add student to lookup table after instantiation
         self.__github_name_map[self.github_name] = self
+
+    def __le__(self, other):
+        """Students compare alphabetically, by ``last_name``, ``first_name``, ``github_name``."""
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        self_comp_key = (self.last_name, self.first_name, self.github_name)
+        other_comp_key = (other.last_name, other.first_name, other.github_name)
+        return self_comp_key <= other_comp_key
 
     @cached_property
     def full_name(self) -> str:
