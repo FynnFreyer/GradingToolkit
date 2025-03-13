@@ -1,15 +1,15 @@
 import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache, cached_property, total_ordering
-from os import write
 from pathlib import Path
-from shutil import move, Error as ShutilError
-from subprocess import CompletedProcess, run, CalledProcessError
+from shutil import Error as ShutilError
+from shutil import move
+from subprocess import CalledProcessError, CompletedProcess, run
 from typing import ClassVar, Collection, Self
 from xml.etree import ElementTree as ET
 
 import pandas as pd
-from mypy.memprofile import defaultdict
 from pandas import read_csv
 
 from github_classroom_toolkit.model.git import Repository
@@ -46,15 +46,26 @@ class Course:
         students = Student.from_student_data(students_csv)
         return cls(classroom, students)
 
-    def grade_submissions(self): # -> dict[Submission, Grade]: wirft fehler, den ich nicht versehe
+    def grade_submissions(self):  # -> dict[Submission, Grade]: # wirft fehler, den ich nicht versehe
+        """
+        Grades all student submissions for the assignments in the classroom.
+        Method runs tests for all submissions in each assignment, collects grading results and writes final grades
+        into a csv file.
+
+        :return: A dictionary mapping each :class:`Submission` to its corresponsing :class:`Grade`
+        """
+
+        # Retrieve all submissions for each assignment
         submission_lists = {
-            assignment : Submission.from_assignment(assignment)
+            assignment: Submission.from_assignment(assignment)
             for assignment in self.classroom.assignments
         }
 
+        # Run tests for all submissions
         Grade.test_submissions()
 
         grades = {}
+        # Find test result XML files for each submission
         for assignment, submissions in submission_lists.items():
             test_results = Grade.find_test_xmls(submissions)
 
@@ -63,44 +74,61 @@ class Course:
                 if not test_files:
                     print(f"No results for {submission.student.github_name} ({assignment.slug})")
                     continue
+
+                # Generate a Grade object from the test results
                 grades[submission] = Grade.from_test_xmls(submission, test_files)
 
+        # Write all grades to a csv file
         self.write_grades_to_csv(grades, "all_grades.csv")
+        return grades
 
-    def write_grades_to_csv(self, grades : dict, output_file: str):
+    def write_grades_to_csv(self, grades: dict, output_file: str):
         """
         Writes submissions to a CSV file.
+        The method organizes grades for each student and ensures that every assignment is represented in
+        the csv file. Also calculates total points and percentages
 
-        :param grades: A dict of calculated Grade objects
+        :param grades: A dictionary mapping each Submission to its corresponding Grade
         :param output_file: Path to save the CSV file
         :return: Nothing
         """
 
+        # Initialize a dictionary to sture student data
+        # default is used to ensure each student has an entry with default total score
         student_data = defaultdict(lambda: {"Points achieved (Total)": 0, "Points available (Total)": 0})
+
+        # Collect all unique assignment slugs from the submissions
         all_assignments = set(submission.assignment.slug for submission in grades.keys())
 
+        # Fill student_data dict with grades from the given submissions
         for submission, grade in grades.items():
-            student_key = submission.student.github_name
+            student_key = submission.student.github_name  # identifier for each student
 
+            # Ensure basic student information is stored
             student_data[student_key].update({
                 "Github name": submission.student.github_name,
                 "Last name": submission.student.last_name,
                 "First name": submission.student.first_name
             })
 
+            # Store grades for the assignment
             student_data[student_key][f"{submission.assignment.slug} (Achieved)"] = grade.points_received
             student_data[student_key][f"{submission.assignment.slug} (Available)"] = grade.points_available
             student_data[student_key][f"{submission.assignment.slug} (%)"] = round(grade.percentage*100, 2)
 
-            # Update total scores
+            # Update the total scores across all assignments
             student_data[student_key]["Points achieved (Total)"] += grade.points_received
             student_data[student_key]["Points available (Total)"] += grade.points_available
 
+        # Ensure all assignments exist as columns for each student.
+        # If a student has no submission for an assignment, their default score is 0
+        # TODO set default available points to max points of the assignment (from starter_code?)
         for student in student_data.values():
             for assignment in all_assignments:
                 student.setdefault(f"{assignment} (Achieved)", 0)
                 student.setdefault(f"{assignment} (%)", 0.0)
 
+        # Calculate total percentage for each student
         for student in student_data.values():
             if student["Points available (Total)"] > 0:
                 student["Percentage (Total)"] = round(
@@ -109,20 +137,22 @@ class Course:
             else:
                 student["Percentage (Total)"] = 0.0
 
+            # Convert student data into a Dataframe
             df = pd.DataFrame(student_data.values())
 
+            # Define correct column order for the csv
             ordered_columns = (
                 ["Github name", "Last name", "First name"] +
                 [col for assignment in all_assignments for col in
-                 (f"{assignment} (Achieved)", f"{assignment} (Available)", f"{assignment} (%)")] +
+                (f"{assignment} (Achieved)", f"{assignment} (Available)", f"{assignment} (%)")] +
                 ["Points achieved (Total)", "Points available (Total)", "Percentage (Total)"]
             )
 
+            # Reorder the Dataframe columns
             df = df[ordered_columns]
 
+            # Save the Dataframe to a csv file
             df.to_csv(output_file, index=False)
-
-
 
 
 @total_ordering
@@ -217,7 +247,7 @@ class Submission:
         # ensure that latest commit pre deadline is checked out
         if self.assignment.deadline:
             commit_hash = self.repo.get_latest_commit_hash(self.assignment.deadline)
-            #self.repo.checkout(commit_hash)
+            # self.repo.checkout(commit_hash)
         # ensure that tests are restored to repo
         self._restore_tests()
 
