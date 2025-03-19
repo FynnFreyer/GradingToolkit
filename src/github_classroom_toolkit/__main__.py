@@ -25,8 +25,7 @@ def main(args: Namespace | None = None):
     args = args or parse_args()
 
     course = Course.from_classroom_and_students(args.classroom, args.students)
-
-    grades = course.grade_submissions()
+    course.grade_course("all_grades.csv")
 
 
 if __name__ == "__main__":

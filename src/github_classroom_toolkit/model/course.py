@@ -1,5 +1,4 @@
 import shutil
-from collections import defaultdict
 from dataclasses import dataclass
 from functools import cache, cached_property, total_ordering
 from pathlib import Path
@@ -10,7 +9,7 @@ from typing import ClassVar, Collection, Self
 from xml.etree import ElementTree as ET
 
 import pandas as pd
-from pandas import read_csv
+from pandas import read_csv, DataFrame
 
 from github_classroom_toolkit.model.git import Repository
 from github_classroom_toolkit.model.github import Assignment, Classroom
@@ -31,6 +30,11 @@ class Course:
     def student_map(self) -> dict[str, "Student"]:
         """Maps GitHub name to student object."""
         return {student.github_name: student for student in self.students}
+
+    def grade_course(self, csv_out: str) -> None:
+        submission_grade_map = self.grade_submissions()
+        data = self.tabulate_grades(submission_grade_map)
+        self.write_grades_to_csv(data, csv_out)
 
     @classmethod
     @cache
@@ -77,12 +81,9 @@ class Course:
 
                 # Generate a Grade object from the test results
                 grades[submission] = Grade.from_test_xmls(submission, test_files)
-
-        # Write all grades to a csv file
-        self.write_grades_to_csv(grades, "all_grades.csv")
         return grades
 
-    def write_grades_to_csv(self, grades: dict, output_file: str):
+    def tabulate_grades(self, grades: dict["Submission", "Grade"]) -> DataFrame:
         """
         Writes submissions to a CSV file.
         The method organizes grades for each student and ensures that every assignment is represented in
@@ -92,67 +93,53 @@ class Course:
         :param output_file: Path to save the CSV file
         :return: Nothing
         """
+        # TODO set default available points to max points of the assignment (from starter_code?)
 
-        # Initialize a dictionary to sture student data
-        # default is used to ensure each student has an entry with default total score
-        student_data = defaultdict(lambda: {"Points achieved (Total)": 0, "Points available (Total)": 0})
-
-        # Collect all unique assignment slugs from the submissions
-        all_assignments = set(submission.assignment.slug for submission in grades.keys())
+        # Initialize a dictionary to store student data
+        student_data = {
+            "github_name": [],
+            "assignment": [],
+            "received": [],
+            "available": [],
+            "percentage": [],
+        }
 
         # Fill student_data dict with grades from the given submissions
         for submission, grade in grades.items():
             student_key = submission.student.github_name  # identifier for each student
+            assignment_key = submission.assignment.slug  # identifier for each assignment
 
-            # Ensure basic student information is stored
-            student_data[student_key].update({
-                "Github name": submission.student.github_name,
-                "Last name": submission.student.last_name,
-                "First name": submission.student.first_name
-            })
+            # Store data for the graded submission
+            student_data["github_name"].append(student_key)
+            student_data["assignment"].append(assignment_key)
+            student_data["received"].append(grade.points_received)
+            student_data["available"].append(grade.points_available)
+            student_data["percentage"].append(round(grade.percentage * 100, 2))
 
-            # Store grades for the assignment
-            student_data[student_key][f"{submission.assignment.slug} (Achieved)"] = grade.points_received
-            student_data[student_key][f"{submission.assignment.slug} (Available)"] = grade.points_available
-            student_data[student_key][f"{submission.assignment.slug} (%)"] = round(grade.percentage*100, 2)
+        # Produce data frame with multiindex
+        data = pd.DataFrame(student_data).set_index(["github_name", "assignment"])
+        return data
 
-            # Update the total scores across all assignments
-            student_data[student_key]["Points achieved (Total)"] += grade.points_received
-            student_data[student_key]["Points available (Total)"] += grade.points_available
+    def write_grades_to_csv(self, data: DataFrame, output_file: str | Path) -> None:
+        """
+        Writes submissions to a CSV file.
+        The method organizes grades for each student and ensures that every assignment is represented in
+        the csv file.
 
-        # Ensure all assignments exist as columns for each student.
-        # If a student has no submission for an assignment, their default score is 0
-        # TODO set default available points to max points of the assignment (from starter_code?)
-        for student in student_data.values():
-            for assignment in all_assignments:
-                student.setdefault(f"{assignment} (Achieved)", 0)
-                student.setdefault(f"{assignment} (%)", 0.0)
-
-        # Calculate total percentage for each student
-        for student in student_data.values():
-            if student["Points available (Total)"] > 0:
-                student["Percentage (Total)"] = round(
-                    (student["Points achieved (Total)"] / student["Points available (Total)"]) * 100, 2
-                )
-            else:
-                student["Percentage (Total)"] = 0.0
-
-            # Convert student data into a Dataframe
-            df = pd.DataFrame(student_data.values())
-
-            # Define correct column order for the csv
-            ordered_columns = (
-                ["Github name", "Last name", "First name"] +
-                [col for assignment in all_assignments for col in
-                (f"{assignment} (Achieved)", f"{assignment} (Available)", f"{assignment} (%)")] +
-                ["Points achieved (Total)", "Points available (Total)", "Percentage (Total)"]
-            )
-
-            # Reorder the Dataframe columns
-            df = df[ordered_columns]
-
-            # Save the Dataframe to a csv file
-            df.to_csv(output_file, index=False)
+        :param data: A dataframe as produced by :meth:`tabulate_data`.
+        :param output_file: Path to save the CSV file to.
+        :return: Nothing
+        """
+        flat_data = data.reset_index()
+        # Get the first and last names
+        students = flat_data["github_name"].apply(lambda name: self.student_map.get(name))
+        flat_data["first_name"] = students.apply(lambda student: student.first_name)
+        flat_data["last_name"] = students.apply(lambda student: student.last_name)
+        # Reorder columns
+        cols = ["github_name", "assignment", "last_name", "first_name", "received", "available", "percentage"]
+        flat_data = flat_data[cols]
+        # Save the Dataframe to a CSV file
+        flat_data.to_csv(output_file, index=False)
 
 
 @total_ordering
