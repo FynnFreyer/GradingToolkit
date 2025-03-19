@@ -46,7 +46,7 @@ class Course:
         students = Student.from_student_data(students_csv)
         return cls(classroom, students)
 
-    def grade_submissions(self):  # -> dict[Submission, Grade]: # wirft fehler, den ich nicht versehe
+    def grade_submissions(self) -> dict["Submission", "Grade"]:
         """
         Grades all student submissions for the assignments in the classroom.
         Method runs tests for all submissions in each assignment, collects grading results and writes final grades
