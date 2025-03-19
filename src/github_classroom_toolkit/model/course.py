@@ -56,7 +56,7 @@ class Course:
         Method runs tests for all submissions in each assignment, collects grading results and writes final grades
         into a csv file.
 
-        :return: A dictionary mapping each :class:`Submission` to its corresponsing :class:`Grade`
+        :return: A dictionary mapping each :class:`Submission` to its corresponding :class:`Grade`
         """
 
         # Retrieve all submissions for each assignment
@@ -85,13 +85,11 @@ class Course:
 
     def tabulate_grades(self, grades: dict["Submission", "Grade"]) -> DataFrame:
         """
-        Writes submissions to a CSV file.
-        The method organizes grades for each student and ensures that every assignment is represented in
-        the csv file. Also calculates total points and percentages
+        Produces a ``DataFrame`` with grade data from a given dictionary mapping :class:`Submission` to :class:`Grade`
+        objects.
 
         :param grades: A dictionary mapping each Submission to its corresponding Grade
-        :param output_file: Path to save the CSV file
-        :return: Nothing
+        :return: A ``DataFrame`` with grade data.
         """
         # TODO set default available points to max points of the assignment (from starter_code?)
 
@@ -164,7 +162,7 @@ class Student:
 
     def __post_init__(self):
         # add student to lookup table after instantiation
-        self.__github_name_map[self.github_name] = self
+        self.__github_name_map[self.github_name] = self  # todo lookup über course
 
     def __le__(self, other):
         """Students compare alphabetically, by ``last_name``, ``first_name``, ``github_name``."""
