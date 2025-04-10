@@ -289,7 +289,7 @@ class Submission:
             return tuple(submission_paths)
 
         # Clone only repositories that don't exist in the assignment-folder
-        for (_, _, gh_name), row in assignment.grades.iterrows():
+        for (_, _, gh_name), row in assignment.grades_csv_data.iterrows():
             repo_url = row["student_repository_url"]
             target = assignment_dir / gh_name
 

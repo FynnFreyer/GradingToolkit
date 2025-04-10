@@ -170,7 +170,7 @@ class Assignment:
         return cls(classroom, assignment_id, title, deadline, invite_url, starter_code)
 
     @cached_property
-    def grades(self) -> DataFrame:
+    def grades_csv_data(self) -> DataFrame:
         """Downloads the ``grades.csv`` file for this assignment and loads it into a DataFrame."""
         grades_csv = Path(f"{self.id}_grades.csv")
         if not grades_csv.exists():
