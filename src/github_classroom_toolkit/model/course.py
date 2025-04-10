@@ -40,12 +40,12 @@ class Course:
     @cache
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
         """
-        Creates a Course instance from a Github Classroom ID and CSV file of students.
-        :param classroom_id: ID of the Github Classroom
-        :param students_csv: Path to a CSV containing student information
-        :return: A Course object
-        """
+        Creates a ``Course`` instance from a GitHub classroom ID and CSV file of students.
 
+        :param classroom_id: ID of the GitHub classroom
+        :param students_csv: Path to a CSV containing student information
+        :return: A ``Course`` object
+        """
         classroom = Classroom.from_id(classroom_id)
         students = Student.from_student_data(students_csv)
         return cls(classroom, students)
