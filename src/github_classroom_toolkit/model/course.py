@@ -5,7 +5,7 @@ from pathlib import Path
 from shutil import Error as ShutilError
 from shutil import move
 from subprocess import CalledProcessError, CompletedProcess, run
-from typing import ClassVar, Collection, Self
+from typing import ClassVar, Collection, Self, Iterable
 from xml.etree import ElementTree as ET
 
 import pandas as pd
@@ -31,18 +31,6 @@ class Course:
         """Maps GitHub name to student object."""
         return {student.github_name: student for student in self.students}
 
-    def grade_course(self, csv_out: str | Path) -> DataFrame:
-        """
-        Compute grades for this course, write them to a CSV file and return them as a ``pd.DataFrame``.
-
-        :param csv_out: The path of the CSV file to write the grading data to.
-        :return: A data frame containing the grade data.
-        """
-        submission_grade_map = self.grade_submissions()
-        data = self.tabulate_grades(submission_grade_map)
-        self.write_grades_to_csv(data, csv_out)
-        return data
-
     @classmethod
     @cache
     def from_classroom_and_students(cls, classroom_id: int, students_csv: str | Path) -> Self:
@@ -56,95 +44,6 @@ class Course:
         classroom = Classroom.from_id(classroom_id)
         students = Student.from_student_data(students_csv)
         return cls(classroom, students)
-
-    def grade_submissions(self) -> dict["Submission", "Grade"]:
-        """
-        Grades all student submissions for the assignments in the classroom.
-        Method runs tests for all submissions in each assignment, collects grading results and writes final grades
-        into a csv file.
-
-        :return: A dictionary mapping each :class:`Submission` to its corresponding :class:`Grade`
-        """
-
-        # Retrieve all submissions for each assignment
-        submission_lists = {
-            assignment: Submission.from_assignment(assignment)
-            for assignment in self.classroom.assignments
-        }
-
-        # Run tests for all submissions
-        Grade.test_submissions()
-
-        grades = {}
-        # Find test result XML files for each submission
-        for assignment, submissions in submission_lists.items():
-            test_results = Grade.find_test_xmls(submissions)
-
-            for submission in submissions:
-                test_files = test_results.get(submission, [])
-                if not test_files:
-                    print(f"No results for {submission.student.github_name} ({assignment.slug})")
-                    continue
-
-                # Generate a Grade object from the test results
-                grades[submission] = Grade.from_test_xmls(submission, test_files)
-        return grades
-
-    def tabulate_grades(self, grades: dict["Submission", "Grade"]) -> DataFrame:
-        """
-        Produces a ``DataFrame`` with grade data from a given dictionary mapping :class:`Submission` to :class:`Grade`
-        objects.
-
-        :param grades: A dictionary mapping each Submission to its corresponding Grade
-        :return: A ``DataFrame`` with grade data.
-        """
-        # TODO set default available points to max points of the assignment (from starter_code?)
-
-        # Initialize a dictionary to store student data
-        student_data = {
-            "github_name": [],
-            "assignment": [],
-            "received": [],
-            "available": [],
-            "percentage": [],
-        }
-
-        # Fill student_data dict with grades from the given submissions
-        for submission, grade in grades.items():
-            student_key = submission.student.github_name  # identifier for each student
-            assignment_key = submission.assignment.slug  # identifier for each assignment
-
-            # Store data for the graded submission
-            student_data["github_name"].append(student_key)
-            student_data["assignment"].append(assignment_key)
-            student_data["received"].append(grade.points_received)
-            student_data["available"].append(grade.points_available)
-            student_data["percentage"].append(round(grade.percentage * 100, 2))
-
-        # Produce data frame with multiindex
-        data = pd.DataFrame(student_data).set_index(["github_name", "assignment"])
-        return data
-
-    def write_grades_to_csv(self, data: DataFrame, output_file: str | Path) -> None:
-        """
-        Writes submissions to a CSV file.
-        The method organizes grades for each student and ensures that every assignment is represented in
-        the csv file.
-
-        :param data: A dataframe as produced by :meth:`tabulate_data`.
-        :param output_file: Path to save the CSV file to.
-        :return: Nothing
-        """
-        flat_data = data.reset_index()
-        # Get the first and last names
-        students = flat_data["github_name"].apply(lambda name: self.student_map.get(name))
-        flat_data["first_name"] = students.apply(lambda student: student.first_name)
-        flat_data["last_name"] = students.apply(lambda student: student.last_name)
-        # Reorder columns
-        cols = ["github_name", "assignment", "last_name", "first_name", "received", "available", "percentage"]
-        flat_data = flat_data[cols]
-        # Save the Dataframe to a CSV file
-        flat_data.to_csv(output_file, index=False)
 
 
 @total_ordering
@@ -499,3 +398,85 @@ class Grade:
             points_received += points_received_here
 
         return cls(submission, points_available, points_received)
+
+    @classmethod
+    def grade_assignment(cls, assignment: Assignment) -> dict[Submission, Self]:
+        """
+        Grade all submissions for a given :class:`~github_classroom_toolkit.model.github.Assignment`.
+        
+        :param assignment: The :class:`~github_classroom_toolkit.model.github.Assignment` to grade.
+        :return: A dictionary mapping :class:`Submission` objects to their corresponding grade.
+        """
+        submissions = Submission.from_assignment(assignment)
+        cls.test_submissions()
+        test_results = Grade.find_test_xmls(submissions)
+
+        grades = {}
+        for submission in submissions:
+            # Find test result XML files for each submission
+            test_files = test_results.get(submission, [])
+            if not test_files:
+                # TODO: replace with log call
+                print(f"No results for {submission.student.github_name} ({assignment.slug})")
+                continue
+
+            # Generate a Grade object from the test results
+            grades[submission] = Grade.from_test_xmls(submission, test_files)
+        return grades
+
+    @classmethod
+    def grade_course(cls, course: Course) -> dict[Submission, Self]:
+        """
+        Grade all submissions for a given :class:`Course`.
+
+        :param course: The :class:`Course` to grade.
+        :return: A dictionary mapping :class:`Submission` objects to their corresponding grade.
+        """
+        grades = {}
+        for assignment in course.classroom.assignments:
+            grades |= cls.grade_assignment(assignment)
+        return grades
+
+    @staticmethod
+    def tabulate_results(grade_map: dict["Submission", "Grade"]) -> DataFrame:
+        """
+        Produces a ``DataFrame`` with grade data from a given dictionary mapping :class:`Submission` to :class:`Grade`
+        objects. Such mappings are produced by :meth:`grade_course` and :meth:`grade_assignment`.
+
+        :param grade_map: A dictionary mapping each :class:`Submission` to its corresponding :class:`Grade`
+        :return: A ``DataFrame`` with grade data.
+        """
+        # TODO set default available points to max points of the assignment (from starter_code?)
+
+        # Initialize a dictionary to store student data
+        student_data = {
+            "github_name": [],
+            "first_name": [],
+            "last_name": [],
+            "assignment": [],
+            "received": [],
+            "available": [],
+            "percentage": [],
+        }
+
+        # Fill student_data dict with grades from the given submissions
+        for submission, grade in grade_map.items():
+            student = submission.student
+            assignment = submission.assignment
+            student_key = submission.student.github_name  # identifier for each student
+            assignment_key = submission.assignment.slug  # identifier for each assignment
+
+            # Store data for the graded submission
+            student_data["github_name"].append(student.github_name)
+            student_data["first_name"].append(student.first_name)
+            student_data["last_name"].append(student.last_name)
+            student_data["assignment"].append(assignment.slug)
+            student_data["received"].append(grade.points_received)
+            student_data["available"].append(grade.points_available)
+            percentage = round(grade.percentage * 100, 2) if grade.percentage is not None else None
+            student_data["percentage"].append(percentage)
+
+        # Produce data frame with multiindex
+        data = pd.DataFrame(student_data).set_index(["last_name", "first_name", "assignment"])
+        data.sort_index(inplace=True)
+        return data
