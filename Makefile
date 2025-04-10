@@ -3,10 +3,16 @@
 ##---------------------------------
 ##
 
+# Ensure a venv is active, and abort otherwise.
 ifeq (${VIRTUAL_ENV},)
  	$(info No venv is active, but this Makefile can only safely be used inside one.)
  	$(info You can usually create and activate a venv with `python3 -m venv venv && source venv/bin/activate`.)
  	$(error Please activate a venv before proceeding)
+endif
+
+# Ensure uv is installed for dependency management.
+ifneq (,$(shell command -v uv))
+    $(shell python3 -m pip install uv)
 endif
 
 help:  ## Show this help.
