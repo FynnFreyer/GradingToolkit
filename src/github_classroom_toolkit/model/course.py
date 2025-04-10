@@ -310,13 +310,14 @@ class Grade:
     points_received: int
 
     @cached_property
-    def percentage(self) -> float:
+    def percentage(self) -> float | None:
         """
         Computes the percentage score for the submission.
 
-        :return: The percentage of points received out of points available.
+        :return: The percentage of points received out of points available. Or ``None`` if :attr:`points_available` is \
+                 zero.
         """
-        return self.points_received / self.points_available
+        return (self.points_received / self.points_available) if self.points_available != 0 else None
 
     @cached_property
     def is_passing_grade(self) -> bool:
