@@ -144,11 +144,12 @@ class Submission:
 
     @classmethod
     @cache
-    def from_assignment(cls, assignment: Assignment) -> tuple[Self, ...]:
+    def from_assignment(cls, assignment: Assignment, students: Iterable[Student] | None = None) -> tuple[Self, ...]:
         """
         Download student submissions by cloning repositories.
 
         :param assignment: The assignment for which to retrieve the submissions.
+        :param students: An iterable of :class:`Student` objects.
         :return: A tuple of :class:`Submission` objects for this assignment.
         """
 
@@ -161,7 +162,12 @@ class Submission:
         for repo in repos:
             github_name = repo.path.name
             try:
-                student = Student.from_github_name(github_name)
+                # TODO: clean this up. we shouldn't rely on Student.from_github_name
+                if students is None:  # we need to use magic
+                    student = Student.from_github_name(github_name)
+                else:  # we can look up the student
+                    student_map = {student.github_name: student for student in students}
+                    student = student_map[github_name]
             except KeyError:
                 # TODO: replace with log call
                 print(f"Couldn't find student: {github_name}")
