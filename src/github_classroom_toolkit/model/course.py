@@ -31,10 +31,17 @@ class Course:
         """Maps GitHub name to student object."""
         return {student.github_name: student for student in self.students}
 
-    def grade_course(self, csv_out: str) -> None:
+    def grade_course(self, csv_out: str | Path) -> DataFrame:
+        """
+        Compute grades for this course, write them to a CSV file and return them as a ``pd.DataFrame``.
+
+        :param csv_out: The path of the CSV file to write the grading data to.
+        :return: A data frame containing the grade data.
+        """
         submission_grade_map = self.grade_submissions()
         data = self.tabulate_grades(submission_grade_map)
         self.write_grades_to_csv(data, csv_out)
+        return data
 
     @classmethod
     @cache
