@@ -19,6 +19,9 @@ def parse_args(args: Sequence[str] | None = None) -> Namespace:
     parser.add_argument("-s", "--students", type=Student.from_student_data, required=True,
                         help="path to a CSV with names and GitHub accounts of students")
 
+    parser.add_argument("-o", "--out", type=Path, default=None,
+                        help="path to a CSV file to output grade data to. Defaults to `grades_<type>_<id>.csv`.")
+
     return parser.parse_args(args)
 
 
@@ -37,6 +40,7 @@ def main(args: Namespace | None = None):
         # should never happen bc of mutex group, but keeps the IDE happy
         raise NotImplementedError("Only grading classrooms and assignments is supported")
 
+    out = args.out or out  # explicit out arg supersedes defaults
     grades = Grade.tabulate_results(results)
     grades.reset_index().to_csv(out, index=False)
 
