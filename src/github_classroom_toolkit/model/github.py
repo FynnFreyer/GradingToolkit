@@ -135,6 +135,40 @@ class Assignment:
         assignments = assignment_data.apply(lambda row: cls(classroom, *row), axis=1).tolist()
         return tuple(assignments)
 
+    @classmethod
+    @cache
+    def from_id(cls, assignment_id: int) -> Self:
+        """
+        Find an assignment by its GitHub classroom ID.
+
+        :param assignment_id: The GitHub classroom ID of the assignment.
+        :return: The specified assignment.
+        """
+        # get assignment info
+        stdout = get_stdout("gh", "classroom", "assignment", "-a", assignment_id)
+        classroom_info, assignment_info = stdout.split("\n\n")
+
+        # parse the classroom info and create a classroom
+        id_pattern = r"^ID\: (\d+)$"
+        classroom_id_string = search(id_pattern, classroom_info, flags=MULTILINE).group(1)
+        classroom_id = int(classroom_id_string)
+        classroom = Classroom.from_id(classroom_id)
+
+        # parse the assignment info
+        # define regex patterns
+        title_pattern = r"^Title\: (.+)$"
+        deadline_pattern = r"^Deadline\: (.+)$"
+        invite_url_pattern = r"^Invite Link\: (.+)$"
+        starter_code_pattern = r"^Starter Code Repo URL\: (.+)$"
+        # extract data
+        title = search(title_pattern, assignment_info, flags=MULTILINE).group(1)
+        deadline_string = search(deadline_pattern, assignment_info, flags=MULTILINE).group(1)
+        deadline = datetime.fromisoformat(deadline_string)
+        invite_url = search(invite_url_pattern, assignment_info, flags=MULTILINE).group(1)
+        starter_code = search(starter_code_pattern, assignment_info, flags=MULTILINE).group(1)
+        # create the assignment
+        return cls(classroom, assignment_id, title, deadline, invite_url, starter_code)
+
     @cached_property
     def grades(self) -> DataFrame:
         """Downloads the ``grades.csv`` file for this assignment and loads it into a DataFrame."""
