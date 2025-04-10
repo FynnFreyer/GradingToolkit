@@ -10,10 +10,11 @@ def parse_args(args: Sequence[str] | None = None) -> Namespace:
     parser = ArgumentParser()
 
     # mutex group classroom/assignment
-    parser.add_argument("-c", "--classroom", type=int, required=True,
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-c", "--classroom", type=int,
                         help="the ID of the GitHub classroom to grade")
-
-    # mutex arg -a/--assignment...
+    group.add_argument("-a", "--assignment", type=int,
+                        help="the ID of the GitHub assignment to grade")
 
     parser.add_argument("-s", "--students", type=Path, required=True,
                         help="path to a CSV with names and GitHub accounts of students")
@@ -24,8 +25,11 @@ def parse_args(args: Sequence[str] | None = None) -> Namespace:
 def main(args: Namespace | None = None):
     args = args or parse_args()
 
-    course = Course.from_classroom_and_students(args.classroom, args.students)
-    course.grade_course("all_grades.csv")
+    if args.classroom:
+        course = Course.from_classroom_and_students(args.classroom, args.students)
+        course.grade_course("all_grades.csv")
+    elif args.assignment:
+        raise NotImplementedError("Grading individual assignments is not supported yet")
 
 
 if __name__ == "__main__":
